@@ -287,7 +287,7 @@ def compute_dissimilarity(
             prototype_idx = np.random.permutation(data_original.shape[0])[:num_proto]
             prototype = [data_original[i] for i in prototype_idx]
         elif prototype_policy == "fft":
-            prototype_idx = furthest_first_traversal(data_original, num_proto, distance, n_jobs=128)
+            prototype_idx = furthest_first_traversal(data_original, num_proto, distance, n_jobs=32)
             # prototype_idx = furthest_first_traversal(data_original, num_proto, distance)
 
             prototype = [data_original[i] for i in prototype_idx]

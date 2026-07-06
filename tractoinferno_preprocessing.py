@@ -3,6 +3,7 @@ import numpy as np
 import nibabel as nib
 import shutil
 import pandas as pd
+from dipy.io.streamline import load_tractogram
 
 
 
@@ -293,14 +294,19 @@ def info_sub_bundles(path):
 
 def data_info(path_copy):
     results = []
-    for set_f in os.listdir(path_copy):
+    for set_f in sorted(os.listdir(path_copy)):
         print(set_f)
+        if not os.path.isdir(os.path.join(path_copy, set_f)):
+                continue
         for sub in os.listdir(os.path.join(path_copy, set_f)):
             path_sub = os.path.join(path_copy, set_f, sub)
+            
+
             for f in os.listdir(path_sub):
                 file_path = os.path.join(path_sub, f)
-                sft = nib.streamlines.load(file_path)
-                streamlines = sft.streamlines
+                # sft = nib.streamlines.load(file_path)
+                sft = load_tractogram(file_path, 'same')
+                streamlines = np.asarray(sft.streamlines, dtype=object)
                 n_streamlines = len(streamlines)
 
                 mean_len = 0
@@ -315,8 +321,9 @@ def data_info(path_copy):
                     min_len = np.min(lengths)
                     max_len = np.max(lengths)
 
+
                 results.append({
-                    'Dataset':set,
+                    'Dataset':set_f,
                     'Subject': sub,
                     'Bundle': f.split('.')[0].split('__')[-1],
                     'Num streamlines': n_streamlines,
@@ -326,11 +333,59 @@ def data_info(path_copy):
                     'Max Length mm': max_len,
 
                 })
-    
+
     df = pd.DataFrame(results)
     output = f"{path_copy}/streamlines_info.csv"
     df.to_csv(output, index=False)
 
+from tqdm import tqdm
+
+def rearrange_dataset(origin, dest): 
+    # for set_f in os.listdir(origin):
+    #     for sub in tqdm(sorted(os.listdir(os.path.join(origin, set_f))), total=len(os.listdir(os.path.join(origin, set_f)))):
+    #         for file in os.listdir(os.path.join(origin, set_f, sub)):
+    #             dst = os.path.join(dest, file.split('__')[-1].split('_aligned')[0], set_f, sub)
+    #             os.makedirs(dst, exist_ok=True)
+
+    for sub in sorted(os.listdir(dest)):
+        src = os.path.join(origin, sub)
+        for file in os.listdir(src):
+            shutil.copy(os.path.join(src, file), os.path.join(dest, sub))
+
+
+def check_length(path):
+    c = 0
+    for sub in os.listdir(path):
+        for file in os.listdir(os.path.join(path, sub)):
+            if file.endswith('.trx'):
+                c+=1
+
+    print(c)
+
+    # for sub in os.listdir(path):
+    #     for file in os.listdir(os.path.join(path, sub)):
+    #         if os.path.getsize(os.path.join(path, sub,file)) == 0:
+    #             c += 1
+                
+    # print(c)
+
+
+
+import subprocess
+
+def generate_embs(config):
+
+    bundles = ['ILF_L', 'ILF_R','MdLF_L', 'MdLF_R', 'SLF_L', 'SLF_R','PYT_L', 'PYT_R']
+    sets = ['testset', 'trainset', 'validset']
+
+    for bundle in bundles:
+        for set_f in sets:
+            config_file = os.path.join(config, f'config_{bundle}_{set_f}.yaml')
+            cmd = ['python', '/home/alessia/project/streamline_autoencoder/save_embeddings.py', '-C', config_file, '-n', 'train_eclipse']
+            subprocess.check_call(cmd)# , stdout=subprocess.DEVNULL)
+            
+            rearrange_dataset(f'/home/alessia/project/streamline_autoencoder/embeddings/train_eclipse', f'/home/alessia/Desktop/data/TractoInferno_rearranged/bundles_embs/{bundle}/{set_f}')
+            check_length(f'/home/alessia/Desktop/data/TractoInferno_rearranged/bundles_embs/{bundle}/{set_f}')
 
 
 
@@ -346,16 +401,28 @@ if __name__ ==  '__main__':
     bundles = ['AF', 'FAT', 'ILF', 'MdLF', 'SLF', 'PYT']
     path_copy = '/home/alessia/Desktop/data/TractoInferno'
     folder_interest = 'bundles' #['anat', 'bundles']
+    user = 'alessia'
+    bundle = 'FAT'
+    side = 'R'
 
     main_path = '/nilab-qnap/datasets/TractoInferno/derivatives'
 
     output_log = []
 
-
+    # src = f'/home/{user}/Desktop/data/TractoInferno_aligned/bundles'
+    src = f'/home/{user}/project/streamline_autoencoder/embeddings/train_eclipse'
+    dst = f'/home/{user}/Desktop/data/TractoInferno_rearranged/bundles_embs/{bundle}_{side}/trainset'
 
     # first_step_extraction(main_path, path_copy, bundles)
-    info_sub_bundles('/home/alessia/Desktop/data/TractoInferno_aligned/bundles')
+    # info_sub_bundles('/home/alessia/Desktop/data/TractoInferno_aligned/bundles')
     # data_info(os.path.join(path_copy, folder_interest))
+    # rearrange_dataset(src, dst)
+    # check_length(dst)
+
+    # check_length(f'/home/{user}/Desktop/data/TractoInferno_rearranged/bundles/FAT_R/validset')
+
+
+    generate_embs(f'/home/{user}/project/streamline_autoencoder/checkpoints/train_eclipse/train_eclipse')
 
 
         

@@ -4,6 +4,35 @@ from dipy.io.stateful_tractogram import StatefulTractogram
 import json
 from scipy.spatial import KDTree, cKDTree
 
+import numpy as np
+from scipy.spatial.distance import cdist
+
+def robust_euclidean(x, y):
+    """
+    Callable per la distanza euclidea a prova di errore dimensionale.
+    Gestisce automaticamente array 1D, slice 2D (1x32) e confronti vettoriali (Nx32).
+    """
+    # Forza entrambi gli input ad essere almeno 2D. 
+    # Un array di shape (32,) diventa automaticamente (1, 32)
+    x_2d = np.atleast_2d(x)
+    y_2d = np.atleast_2d(y)
+    
+    # Calcola la distanza con cdist (che non dà mai l'errore del "1-D array" perché lavora solo su 2D)
+    dist = cdist(x_2d, y_2d, metric='euclidean')
+    
+    # .squeeze() rimuove le dimensioni inutili.
+    # Se il risultato è una matrice (1, 1), lo converte in un semplice float scalare,
+    # esattamente ciò che la tua funzione chiamante si aspetta.
+    return dist.squeeze()
+
+# --- Come usarlo nella tua funzione originale ---
+# Ora passi "robust_euclidean" come parametro alla funzione che richiedeva il callable.
+#
+# Esempio: 
+# risultato = tua_funzione_fft(embeddings, num_punti, distance_func=robust_euclidean)
+
+
+
 def initialization(bundle_path, streamline_path):
     # Loading ground truth labels
     print("="*50+'\n'+"Loading bundle labels..."+'\n'+"="*50)
