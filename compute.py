@@ -134,6 +134,7 @@ def furthest_first_traversal(S, k, distance, permutation=True, n_jobs=1, chunk_s
         z = int(min_dists.argmax())
         T.append(z)
         _update_min_dists(S, z, min_dists, distance, n_jobs, chunk_size)
+        print(len(T), end="\r")
 
     return idx[T]
 
@@ -289,9 +290,9 @@ def compute_dissimilarity(
         elif prototype_policy == "fft":
             prototype_idx = furthest_first_traversal(data_original, num_proto, distance, n_jobs=32)
             # prototype_idx = furthest_first_traversal(data_original, num_proto, distance)
-
+            return prototype_idx
             prototype = [data_original[i] for i in prototype_idx]
-            return prototype
+            # return prototype
             print("I'm not back")
             # pickle.dump(prototype, open('prototype.pkl', 'wb'))
             

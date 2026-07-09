@@ -138,381 +138,381 @@ from scipy.spatial import KDTree
 
 
 
-def compute_bundle_minimum_distance(streamlines_flipped, streamlines_original):
-    """
-    Calcola la distanza minima assoluta in millimetri tra due bundle e 
-    restituisce le coordinate esatte del punto di massimo contatto.
-    
-    Parametri:
-    streamlines_flipped: Lista o ArraySequence di coordinate (es. AF_L flippato)
-    streamlines_original: Lista o ArraySequence di coordinate (es. AF_R originale)
-    
-    Ritorna:
-    min_distance (float): La distanza minima in millimetri.
-    point_flipped (np.ndarray): Coordinate [x, y, z] sul bundle flippato.
-    point_original (np.ndarray): Coordinate [x, y, z] sul bundle originale controlaterale.
-    """
-    try:
-        # Appiattiamo le streamline in due enormi array di coordinate N x 3
-        points_flipped = np.vstack(streamlines_flipped)
-        points_original = np.vstack(streamlines_original)
-    except ValueError:
-        print("Errore: uno dei due bundle è vuoto.")
-        return np.inf, None, None
-
-    # Costruiamo il KDTree sul bundle originale
-    tree_original = KDTree(points_original)
-
-    # Interroghiamo l'albero: 
-    # - 'distances' conterrà la distanza dal punto più vicino per ogni punto flippato
-    # - 'indices' conterrà l'indice (riga) di quel punto più vicino in points_original
-    distances, indices = tree_original.query(points_flipped, k=1, workers=-1)
-
-    # 1. Troviamo la posizione (indice) della distanza minima assoluta nell'array
-    min_idx_flipped = np.argmin(distances)
-    
-    # 2. Estraiamo il valore della distanza minima
-    min_distance = distances[min_idx_flipped]
-
-    # 3. Estraiamo le coordinate esatte [x, y, z] per il bundle flippato
-    point_flipped = points_flipped[min_idx_flipped]
-    
-    # 4. Usiamo l'array 'indices' per trovare l'indice corrispondente nel bundle originale
-    # ed estrarre le sue coordinate esatte [x, y, z]
-    min_idx_original = indices[min_idx_flipped]
-    point_original = points_original[min_idx_original]
-
-    return min_distance, point_flipped, point_original
-
-
-
-# def greedy_assignment(dist_matrix):
+# def compute_bundle_minimum_distance(streamlines_flipped, streamlines_original):
 #     """
-#     Esegue un'assegnazione greedy 1-a-1 basata sulla distanza minima.
-#     Restituisce una lista di tuple (indice_bundle_A, indice_bundle_B).
+#     Calcola la distanza minima assoluta in millimetri tra due bundle e 
+#     restituisce le coordinate esatte del punto di massimo contatto.
+    
+#     Parametri:
+#     streamlines_flipped: Lista o ArraySequence di coordinate (es. AF_L flippato)
+#     streamlines_original: Lista o ArraySequence di coordinate (es. AF_R originale)
+    
+#     Ritorna:
+#     min_distance (float): La distanza minima in millimetri.
+#     point_flipped (np.ndarray): Coordinate [x, y, z] sul bundle flippato.
+#     point_original (np.ndarray): Coordinate [x, y, z] sul bundle originale controlaterale.
 #     """
-#     n_a, n_b = dist_matrix.shape
-#     assigned_a = set()
-#     assigned_b = set()
-#     pairs = []
+#     try:
+#         # Appiattiamo le streamline in due enormi array di coordinate N x 3
+#         points_flipped = np.vstack(streamlines_flipped)
+#         points_original = np.vstack(streamlines_original)
+#     except ValueError:
+#         print("Errore: uno dei due bundle è vuoto.")
+#         return np.inf, None, None
 
-#     # Appiattisce la matrice e ottiene gli indici ordinati dalla distanza minima alla massima
-#     flat_indices = np.argsort(dist_matrix, axis=None)
+#     # Costruiamo il KDTree sul bundle originale
+#     tree_original = KDTree(points_original)
 
-#     for flat_idx in flat_indices:
-#         # Riconverte l'indice flat nelle coordinate 2D originali (riga, colonna)
-#         i, j = np.unravel_index(flat_idx, dist_matrix.shape)
+#     # Interroghiamo l'albero: 
+#     # - 'distances' conterrà la distanza dal punto più vicino per ogni punto flippato
+#     # - 'indices' conterrà l'indice (riga) di quel punto più vicino in points_original
+#     distances, indices = tree_original.query(points_flipped, k=1, workers=-1)
 
-#         # Se nessuna delle due streamline è già stata assegnata, crea la coppia
-#         if i not in assigned_a and j not in assigned_b:
-#             pairs.append((i, j))
-#             assigned_a.add(i)
-#             assigned_b.add(j)
+#     # 1. Troviamo la posizione (indice) della distanza minima assoluta nell'array
+#     min_idx_flipped = np.argmin(distances)
+    
+#     # 2. Estraiamo il valore della distanza minima
+#     min_distance = distances[min_idx_flipped]
 
-#             # Ottimizzazione: fermati quando hai accoppiato tutte le streamline 
-#             # del bundle più piccolo (i bundle potrebbero avere dimensioni diverse)
-#             if len(assigned_a) == min(n_a, n_b):
-#                 break
+#     # 3. Estraiamo le coordinate esatte [x, y, z] per il bundle flippato
+#     point_flipped = points_flipped[min_idx_flipped]
+    
+#     # 4. Usiamo l'array 'indices' per trovare l'indice corrispondente nel bundle originale
+#     # ed estrarre le sue coordinate esatte [x, y, z]
+#     min_idx_original = indices[min_idx_flipped]
+#     point_original = points_original[min_idx_original]
 
-#     return pairs
-
-
-import numpy as np
-from scipy.spatial import KDTree
-import os
-from dipy.io.stateful_tractogram import StatefulTractogram
-from dipy.io.streamline import save_tractogram
+#     return min_distance, point_flipped, point_original
 
 
-"""
-find_closest_streamline_pair.py
---------------------------------
-Trova la coppia di streamline più vicine tra due bundle:
-tipicamente un bundle flippato (es. AF_L specchiato) e il suo
-controlaterale originale (es. AF_R).
- 
-La ricerca è basata sulla **minima distanza punto-a-punto** tra
-qualsiasi punto del primo bundle e qualsiasi punto del secondo,
-usando un KD-tree per efficienza.
- 
-Dipendenze: numpy, scipy, dipy, nibabel
-"""
- 
-import numpy as np
-from scipy.spatial import cKDTree
-from dipy.io.stateful_tractogram import StatefulTractogram, Space
-from dipy.io.streamline import save_tractogram
- 
- 
 
-def _extract_streamlines(bundle):
+def greedy_assignment(dist_matrix):
     """
-    Estrae le streamline e l'eventuale SFT da un input flessibile.
- 
-    Parameters
-    ----------
-    bundle : StatefulTractogram | list | ArraySequence
-        Bundle in ingresso.
- 
-    Returns
-    -------
-    streamlines : list of np.ndarray
-    sft : StatefulTractogram | None
-        None se l'input non era un SFT (utile per preservare l'header
-        al momento del salvataggio).
+    Esegue un'assegnazione greedy 1-a-1 basata sulla distanza minima.
+    Restituisce una lista di tuple (indice_bundle_A, indice_bundle_B).
     """
-    if isinstance(bundle, StatefulTractogram):
-        return list(bundle.streamlines), bundle
-    streamlines = list(bundle)
-    if not streamlines:
-        raise ValueError("Il bundle in ingresso non contiene streamline.")
-    return streamlines, None
+    n_a, n_b = dist_matrix.shape
+    assigned_a = set()
+    assigned_b = set()
+    pairs = []
+
+    # Appiattisce la matrice e ottiene gli indici ordinati dalla distanza minima alla massima
+    flat_indices = np.argsort(dist_matrix, axis=None)
+
+    for flat_idx in flat_indices:
+        # Riconverte l'indice flat nelle coordinate 2D originali (riga, colonna)
+        i, j = np.unravel_index(flat_idx, dist_matrix.shape)
+
+        # Se nessuna delle due streamline è già stata assegnata, crea la coppia
+        if i not in assigned_a and j not in assigned_b:
+            pairs.append((i, j))
+            assigned_a.add(i)
+            assigned_b.add(j)
+
+            # Ottimizzazione: fermati quando hai accoppiato tutte le streamline 
+            # del bundle più piccolo (i bundle potrebbero avere dimensioni diverse)
+            if len(assigned_a) == min(n_a, n_b):
+                break
+
+    return pairs
+
+
+# import numpy as np
+# from scipy.spatial import KDTree
+# import os
+# from dipy.io.stateful_tractogram import StatefulTractogram
+# from dipy.io.streamline import save_tractogram
+
+
+# """
+# find_closest_streamline_pair.py
+# --------------------------------
+# Trova la coppia di streamline più vicine tra due bundle:
+# tipicamente un bundle flippato (es. AF_L specchiato) e il suo
+# controlaterale originale (es. AF_R).
+ 
+# La ricerca è basata sulla **minima distanza punto-a-punto** tra
+# qualsiasi punto del primo bundle e qualsiasi punto del secondo,
+# usando un KD-tree per efficienza.
+ 
+# Dipendenze: numpy, scipy, dipy, nibabel
+# """
+ 
+# import numpy as np
+# from scipy.spatial import cKDTree
+# from dipy.io.stateful_tractogram import StatefulTractogram, Space
+# from dipy.io.streamline import save_tractogram
  
  
-def _resample(streamlines, n_points):
-    """Ricampiona le streamline a n_points punti (solo per il confronto)."""
-    if n_points is None:
-        return [np.asarray(sl, dtype=np.float64) for sl in streamlines]
-    from dipy.tracking.streamline import set_number_of_points
-    return [np.asarray(set_number_of_points(sl, n_points), dtype=np.float64)
-            for sl in streamlines]
+
+# def _extract_streamlines(bundle):
+#     """
+#     Estrae le streamline e l'eventuale SFT da un input flessibile.
+ 
+#     Parameters
+#     ----------
+#     bundle : StatefulTractogram | list | ArraySequence
+#         Bundle in ingresso.
+ 
+#     Returns
+#     -------
+#     streamlines : list of np.ndarray
+#     sft : StatefulTractogram | None
+#         None se l'input non era un SFT (utile per preservare l'header
+#         al momento del salvataggio).
+#     """
+#     if isinstance(bundle, StatefulTractogram):
+#         return list(bundle.streamlines), bundle
+#     streamlines = list(bundle)
+#     if not streamlines:
+#         raise ValueError("Il bundle in ingresso non contiene streamline.")
+#     return streamlines, None
  
  
-def _build_tree(streamlines):
-    """
-    Impila tutti i punti di un bundle in un unico array e costruisce
-    il KD-tree, mantenendo un vettore di appartenenza per streamline.
- 
-    Returns
-    -------
-    tree      : cKDTree
-    pts_all   : np.ndarray  (N_tot_punti, 3)
-    sl_ids    : np.ndarray  (N_tot_punti,)  — indice streamline per ogni punto
-    """
-    pts_list, id_list = [], []
-    for j, sl in enumerate(streamlines):
-        arr = np.asarray(sl, dtype=np.float64)
-        pts_list.append(arr)
-        id_list.append(np.full(len(arr), j, dtype=np.int64))
-    pts_all = np.vstack(pts_list)
-    sl_ids  = np.concatenate(id_list)
-    return cKDTree(pts_all), pts_all, sl_ids
+# def _resample(streamlines, n_points):
+#     """Ricampiona le streamline a n_points punti (solo per il confronto)."""
+#     if n_points is None:
+#         return [np.asarray(sl, dtype=np.float64) for sl in streamlines]
+#     from dipy.tracking.streamline import set_number_of_points
+#     return [np.asarray(set_number_of_points(sl, n_points), dtype=np.float64)
+#             for sl in streamlines]
  
  
-def _make_sft(streamline, source_sft, reference):
-    """Crea un SFT contenente una singola streamline."""
-    if source_sft is not None:
-        return StatefulTractogram(
-            [streamline],
-            source_sft,
-            space=source_sft.space,
-        )
-    if reference is not None:
-        return StatefulTractogram(
-            [streamline],
-            reference,
-            space=Space.RASMM,
-        )
-    raise ValueError(
-        "Fornire un 'reference' (immagine o path) quando l'input "
-        "non è un StatefulTractogram."
-    )
+# def _build_tree(streamlines):
+#     """
+#     Impila tutti i punti di un bundle in un unico array e costruisce
+#     il KD-tree, mantenendo un vettore di appartenenza per streamline.
+ 
+#     Returns
+#     -------
+#     tree      : cKDTree
+#     pts_all   : np.ndarray  (N_tot_punti, 3)
+#     sl_ids    : np.ndarray  (N_tot_punti,)  — indice streamline per ogni punto
+#     """
+#     pts_list, id_list = [], []
+#     for j, sl in enumerate(streamlines):
+#         arr = np.asarray(sl, dtype=np.float64)
+#         pts_list.append(arr)
+#         id_list.append(np.full(len(arr), j, dtype=np.int64))
+#     pts_all = np.vstack(pts_list)
+#     sl_ids  = np.concatenate(id_list)
+#     return cKDTree(pts_all), pts_all, sl_ids
+ 
+ 
+# def _make_sft(streamline, source_sft, reference):
+#     """Crea un SFT contenente una singola streamline."""
+#     if source_sft is not None:
+#         return StatefulTractogram(
+#             [streamline],
+#             source_sft,
+#             space=source_sft.space,
+#         )
+#     if reference is not None:
+#         return StatefulTractogram(
+#             [streamline],
+#             reference,
+#             space=Space.RASMM,
+#         )
+#     raise ValueError(
+#         "Fornire un 'reference' (immagine o path) quando l'input "
+#         "non è un StatefulTractogram."
+#     )
  
  
 
  
-def find_closest_streamline_pair(
-    bundle1,
-    bundle2,
-    n_points=20,
-    b1_name=None,
-    b2_name=None,
-    sub_name=None,
-    output_prefix=None,
-    reference=None,
-    verbose=True,
-):
-    """
-    Trova la coppia di streamline — una da bundle1, una da bundle2 —
-    i cui punti si avvicinano di più nello spazio 3-D.
+# def find_closest_streamline_pair(
+#     bundle1,
+#     bundle2,
+#     n_points=20,
+#     b1_name=None,
+#     b2_name=None,
+#     sub_name=None,
+#     output_prefix=None,
+#     reference=None,
+#     verbose=True,
+# ):
+#     """
+#     Trova la coppia di streamline — una da bundle1, una da bundle2 —
+#     i cui punti si avvicinano di più nello spazio 3-D.
  
-    Uso tipico: confronto tra un bundle flippato (es. AF_L specchiato
-    in RAS) e il suo controlaterale originale (es. AF_R).
+#     Uso tipico: confronto tra un bundle flippato (es. AF_L specchiato
+#     in RAS) e il suo controlaterale originale (es. AF_R).
  
-    Parameters
-    ----------
-    bundle1 : StatefulTractogram | list | ArraySequence
-        Primo bundle (es. AF_L flippato).
-    bundle2 : StatefulTractogram | list | ArraySequence
-        Secondo bundle (es. AF_R originale).
-    n_points : int | None
-        Numero di punti a cui ricampionare le streamline prima
-        del confronto (default 20).
-        - Velocizza la ricerca e uniforma la densità dei punti.
-        - Le streamline originali (non ricampionate) vengono comunque
-          restituite e salvate.
-        - Impostare None per usare i punti originali (più lento).
-    output_prefix : str | None
-        Se fornito, salva le due streamline più vicine come:
-          ``<output_prefix>_bundle1.trk``
-          ``<output_prefix>_bundle2.trk``
-    reference : str | Nifti1Image | None
-        Immagine anatomica di riferimento per il salvataggio .trk.
-        Necessaria solo quando l'input non è un SFT.
-    verbose : bool
-        Stampa informazioni sull'avanzamento.
+#     Parameters
+#     ----------
+#     bundle1 : StatefulTractogram | list | ArraySequence
+#         Primo bundle (es. AF_L flippato).
+#     bundle2 : StatefulTractogram | list | ArraySequence
+#         Secondo bundle (es. AF_R originale).
+#     n_points : int | None
+#         Numero di punti a cui ricampionare le streamline prima
+#         del confronto (default 20).
+#         - Velocizza la ricerca e uniforma la densità dei punti.
+#         - Le streamline originali (non ricampionate) vengono comunque
+#           restituite e salvate.
+#         - Impostare None per usare i punti originali (più lento).
+#     output_prefix : str | None
+#         Se fornito, salva le due streamline più vicine come:
+#           ``<output_prefix>_bundle1.trk``
+#           ``<output_prefix>_bundle2.trk``
+#     reference : str | Nifti1Image | None
+#         Immagine anatomica di riferimento per il salvataggio .trk.
+#         Necessaria solo quando l'input non è un SFT.
+#     verbose : bool
+#         Stampa informazioni sull'avanzamento.
  
-    Returns
-    -------
-    result : dict
-        Chiavi:
-        ``'streamline1'``    — np.ndarray, streamline più vicina da bundle1
-        ``'streamline2'``    — np.ndarray, streamline più vicina da bundle2
-        ``'idx1'``           — int, indice in bundle1
-        ``'idx2'``           — int, indice in bundle2
-        ``'min_distance'``   — float, distanza minima in mm tra la coppia
-        ``'closest_point1'`` — np.ndarray (3,), punto su sl1 più vicino a sl2
-        ``'closest_point2'`` — np.ndarray (3,), punto su sl2 più vicino a sl1
+#     Returns
+#     -------
+#     result : dict
+#         Chiavi:
+#         ``'streamline1'``    — np.ndarray, streamline più vicina da bundle1
+#         ``'streamline2'``    — np.ndarray, streamline più vicina da bundle2
+#         ``'idx1'``           — int, indice in bundle1
+#         ``'idx2'``           — int, indice in bundle2
+#         ``'min_distance'``   — float, distanza minima in mm tra la coppia
+#         ``'closest_point1'`` — np.ndarray (3,), punto su sl1 più vicino a sl2
+#         ``'closest_point2'`` — np.ndarray (3,), punto su sl2 più vicino a sl1
  
-    Notes
-    -----
-    Algoritmo
-    ~~~~~~~~~
-    1. Costruisce un KD-tree con tutti i punti di bundle2.
-    2. Per ogni streamline di bundle1, interroga il KD-tree per trovare
-       il punto più vicino in bundle2 → distanza e streamline di appartenenza.
-    3. Aggiorna il minimo globale.
-    Complessità: O(N1 · P · log(N2 · P)) vs O(N1 · N2 · P²)
-    del doppio ciclo naïve.
-    """
-    # ---- estrazione --------------------------------------------------------
-    streamlines1, sft1 = _extract_streamlines(bundle1)
-    streamlines2, sft2 = _extract_streamlines(bundle2)
+#     Notes
+#     -----
+#     Algoritmo
+#     ~~~~~~~~~
+#     1. Costruisce un KD-tree con tutti i punti di bundle2.
+#     2. Per ogni streamline di bundle1, interroga il KD-tree per trovare
+#        il punto più vicino in bundle2 → distanza e streamline di appartenenza.
+#     3. Aggiorna il minimo globale.
+#     Complessità: O(N1 · P · log(N2 · P)) vs O(N1 · N2 · P²)
+#     del doppio ciclo naïve.
+#     """
+#     # ---- estrazione --------------------------------------------------------
+#     streamlines1, sft1 = _extract_streamlines(bundle1)
+#     streamlines2, sft2 = _extract_streamlines(bundle2)
  
-    if verbose:
-        print(f"Bundle 1: {len(streamlines1)} streamline")
-        print(f"Bundle 2: {len(streamlines2)} streamline")
+#     if verbose:
+#         print(f"Bundle 1: {len(streamlines1)} streamline")
+#         print(f"Bundle 2: {len(streamlines2)} streamline")
  
-    # ---- ricampionamento (solo per il confronto) ---------------------------
-    cmp1 = _resample(streamlines1, n_points)
-    cmp2 = _resample(streamlines2, n_points)
+#     # ---- ricampionamento (solo per il confronto) ---------------------------
+#     cmp1 = _resample(streamlines1, n_points)
+#     cmp2 = _resample(streamlines2, n_points)
  
-    # ---- KD-tree su bundle2 ------------------------------------------------
-    if verbose:
-        n_pts = sum(len(sl) for sl in cmp2)
-        print(f"Costruzione KD-tree con {n_pts} punti da bundle2 …")
+#     # ---- KD-tree su bundle2 ------------------------------------------------
+#     if verbose:
+#         n_pts = sum(len(sl) for sl in cmp2)
+#         print(f"Costruzione KD-tree con {n_pts} punti da bundle2 …")
  
-    tree2, pts2_all, sl2_ids = _build_tree(cmp2)
+#     tree2, pts2_all, sl2_ids = _build_tree(cmp2)
  
-    # ---- ricerca del minimo globale ----------------------------------------
-    global_min         = np.inf
-    best_i = best_j    = 0
-    best_pt1_local_idx = 0          # indice locale in cmp1[best_i]
-    best_pt2_global_idx= 0          # indice globale in pts2_all
+#     # ---- ricerca del minimo globale ----------------------------------------
+#     global_min         = np.inf
+#     best_i = best_j    = 0
+#     best_pt1_local_idx = 0          # indice locale in cmp1[best_i]
+#     best_pt2_global_idx= 0          # indice globale in pts2_all
  
-    for i, sl1 in enumerate(cmp1):
-        # Nearest-neighbour per ogni punto di sl1 nell'intero bundle2
-        dists, nn_idx = tree2.query(sl1)          # shape (P,)
+#     for i, sl1 in enumerate(cmp1):
+#         # Nearest-neighbour per ogni punto di sl1 nell'intero bundle2
+#         dists, nn_idx = tree2.query(sl1)          # shape (P,)
  
-        local_argmin  = int(np.argmin(dists))
-        local_min_d   = float(dists[local_argmin])
+#         local_argmin  = int(np.argmin(dists))
+#         local_min_d   = float(dists[local_argmin])
  
-        if local_min_d < global_min:
-            global_min          = local_min_d
-            best_i              = i
-            best_pt1_local_idx  = local_argmin
-            best_pt2_global_idx = int(nn_idx[local_argmin])
-            best_j              = int(sl2_ids[best_pt2_global_idx])
+#         if local_min_d < global_min:
+#             global_min          = local_min_d
+#             best_i              = i
+#             best_pt1_local_idx  = local_argmin
+#             best_pt2_global_idx = int(nn_idx[local_argmin])
+#             best_j              = int(sl2_ids[best_pt2_global_idx])
  
-    if verbose:
-        print(f"\nCoppia trovata → bundle1[{best_i}]  ↔  bundle2[{best_j}]")
-        print(f"Distanza minima: {global_min:.4f} mm")
+#     if verbose:
+#         print(f"\nCoppia trovata → bundle1[{best_i}]  ↔  bundle2[{best_j}]")
+#         print(f"Distanza minima: {global_min:.4f} mm")
  
-    # ---- streamline originali e punti più vicini ----------------------------
-    sl_best1 = np.asarray(streamlines1[best_i], dtype=np.float64)
-    sl_best2 = np.asarray(streamlines2[best_j], dtype=np.float64)
+#     # ---- streamline originali e punti più vicini ----------------------------
+#     sl_best1 = np.asarray(streamlines1[best_i], dtype=np.float64)
+#     sl_best2 = np.asarray(streamlines2[best_j], dtype=np.float64)
  
-    closest_pt1 = cmp1[best_i][best_pt1_local_idx]
-    closest_pt2 = pts2_all[best_pt2_global_idx]
+#     closest_pt1 = cmp1[best_i][best_pt1_local_idx]
+#     closest_pt2 = pts2_all[best_pt2_global_idx]
 
-    np.save(f"/home/alessia.ianes/Desktop/data/TractoInferno_rearranged/correspondences/{sub_name}_{b1_name}_{b2_name}_closest_points.npy", np.array([closest_pt1, closest_pt2]))
-    np.save(f"/home/alessia.ianes/Desktop/data/TractoInferno_rearranged/correspondences/{sub_name}_{b1_name}_{b2_name}_min_distance.npy", global_min)
+#     np.save(f"/home/alessia.ianes/Desktop/data/TractoInferno_rearranged/correspondences/{sub_name}_{b1_name}_{b2_name}_closest_points.npy", np.array([closest_pt1, closest_pt2]))
+#     np.save(f"/home/alessia.ianes/Desktop/data/TractoInferno_rearranged/correspondences/{sub_name}_{b1_name}_{b2_name}_min_distance.npy", global_min)
 
  
-    # ---- salvataggio --------------------------------------------------------
-    if output_prefix is not None:
-        _save_pair(
-            sl_best1, sl_best2,
-            sft1, sft2, b1_name, b2_name, sub_name,
-            reference,
-            output_prefix,
-            verbose,
-        )
+#     # ---- salvataggio --------------------------------------------------------
+#     if output_prefix is not None:
+#         _save_pair(
+#             sl_best1, sl_best2,
+#             sft1, sft2, b1_name, b2_name, sub_name,
+#             reference,
+#             output_prefix,
+#             verbose,
+#         )
  
-    return {
-        "streamline1":    sl_best1,
-        "streamline2":    sl_best2,
-        "idx1":           best_i,
-        "idx2":           best_j,
-        "min_distance":   global_min,
-        "closest_point1": closest_pt1,
-        "closest_point2": closest_pt2,
-    }
+#     return {
+#         "streamline1":    sl_best1,
+#         "streamline2":    sl_best2,
+#         "idx1":           best_i,
+#         "idx2":           best_j,
+#         "min_distance":   global_min,
+#         "closest_point1": closest_pt1,
+#         "closest_point2": closest_pt2,
+#     }
  
  
-# ---------------------------------------------------------------------------
-# Salvataggio
-# ---------------------------------------------------------------------------
+# # ---------------------------------------------------------------------------
+# # Salvataggio
+# # ---------------------------------------------------------------------------
  
-def _save_pair(sl1, sl2, sft1, sft2, b1_name, b2_name, sub_name, reference, prefix, verbose=True):
-    """
-    Salva le due streamline come file .trk separati.
+# def _save_pair(sl1, sl2, sft1, sft2, b1_name, b2_name, sub_name, reference, prefix, verbose=True):
+#     """
+#     Salva le due streamline come file .trk separati.
  
-    Riutilizza l'header dell'SFT originale quando disponibile;
-    altrimenti usa il 'reference' fornito con spazio RASMM.
-    """
-    pairs = [
-        ('flip', sl1, sft1),
-        ('original', sl2, sft2),
-    ]
-    for label, sl, sft in pairs:
-        sft_out = _make_sft(sl, sft, reference)
-        path = f"/home/alessia.ianes/Desktop/data/TractoInferno_rearranged/correspondences_trk/{sub_name}_{prefix}_{b1_name}_{b2_name}_{label}_bundle.trk"
-        save_tractogram(sft_out, path, bbox_valid_check=False)
-        if verbose:
-            print(f"Salvato → {path}")
+#     Riutilizza l'header dell'SFT originale quando disponibile;
+#     altrimenti usa il 'reference' fornito con spazio RASMM.
+#     """
+#     pairs = [
+#         ('flip', sl1, sft1),
+#         ('original', sl2, sft2),
+#     ]
+#     for label, sl, sft in pairs:
+#         sft_out = _make_sft(sl, sft, reference)
+#         path = f"/home/alessia.ianes/Desktop/data/TractoInferno_rearranged/correspondences_trk/{sub_name}_{prefix}_{b1_name}_{b2_name}_{label}_bundle.trk"
+#         save_tractogram(sft_out, path, bbox_valid_check=False)
+#         if verbose:
+#             print(f"Salvato → {path}")
 
     
-def find_correspondence(root_path, flipped_tractogram, original_bundle, bundles, opp_name, sub):
+# def find_correspondence(root_path, flipped_tractogram, original_bundle, bundles, opp_name, sub):
 
-    # print(matched_pairs)
-    corr = os.path.join(root_path, 'correspondences')
-    os.makedirs(corr, exist_ok=True)
-    corr_trk = os.path.join(root_path, 'correspondences_trk')
-    os.makedirs(corr_trk, exist_ok=True)
+#     # print(matched_pairs)
+#     corr = os.path.join(root_path, 'correspondences')
+#     os.makedirs(corr, exist_ok=True)
+#     corr_trk = os.path.join(root_path, 'correspondences_trk')
+#     os.makedirs(corr_trk, exist_ok=True)
 
-    # --- ricerca e salvataggio ----------------------------------------------
-    result = find_closest_streamline_pair(
-        bundle1       = flipped_tractogram,   # o una lista di streamline
-        bundle2       = original_bundle,            # o una lista di streamline
-        n_points      = 32,                  # punti per il confronto
-        b1_name       = bundles,                 # solo per il salvataggio
-        b2_name       = opp_name,                 # solo per il salvataggio
-        sub_name     = sub,                       # solo per il salvataggio
-        output_prefix = "closest_pair",      # → closest_pair_bundle1/2.trk
-        # reference   = "T1.nii.gz"         # solo se i bundle NON sono SFT
-    )
+#     # --- ricerca e salvataggio ----------------------------------------------
+#     result = find_closest_streamline_pair(
+#         bundle1       = flipped_tractogram,   # o una lista di streamline
+#         bundle2       = original_bundle,            # o una lista di streamline
+#         n_points      = 32,                  # punti per il confronto
+#         b1_name       = bundles,                 # solo per il salvataggio
+#         b2_name       = opp_name,                 # solo per il salvataggio
+#         sub_name     = sub,                       # solo per il salvataggio
+#         output_prefix = "closest_pair",      # → closest_pair_bundle1/2.trk
+#         # reference   = "T1.nii.gz"         # solo se i bundle NON sono SFT
+#     )
 
-    print("\n--- Risultati ---")
-    print(f"Indice in bundle1 : {result['idx1']}")
-    print(f"Indice in bundle2 : {result['idx2']}")
-    print(f"Distanza minima   : {result['min_distance']:.4f} mm")
-    print(f"Punto su sl1      : {result['closest_point1']}")
-    print(f"Punto su sl2      : {result['closest_point2']}")
+#     print("\n--- Risultati ---")
+#     print(f"Indice in bundle1 : {result['idx1']}")
+#     print(f"Indice in bundle2 : {result['idx2']}")
+#     print(f"Distanza minima   : {result['min_distance']:.4f} mm")
+#     print(f"Punto su sl1      : {result['closest_point1']}")
+#     print(f"Punto su sl2      : {result['closest_point2']}")
 
-    # Accesso diretto alle streamline
-    # sl1 = result["streamline1"]   # np.ndarray (N_pts, 3)
-    # sl2 = result["streamline2"]   # np.ndarray (M_pts, 3)
+#     # Accesso diretto alle streamline
+#     # sl1 = result["streamline1"]   # np.ndarray (N_pts, 3)
+#     # sl2 = result["streamline2"]   # np.ndarray (M_pts, 3)
 
 
 
@@ -523,10 +523,18 @@ from dipy.tracking.distances import bundles_distances_mdf
 def flip_bundle(bundle_path, root_path):
 
     for bundles in sorted(os.listdir(bundle_path)):
+      
         for set_f in sorted(os.listdir(os.path.join(bundle_path, bundles))):
             for sub in sorted(os.listdir(os.path.join(bundle_path, bundles, set_f))):
                 for file in os.listdir(os.path.join(bundle_path, bundles, set_f, sub)):
+
+                    if os.path.exists(os.path.join(root_path, 'flip_bundles', bundles, set_f, sub, file.replace('_32_points.trk', '_flipped.trk'))):
+                        continue
+
                     file_path = os.path.join(bundle_path, bundles, set_f, sub, file)
+
+
+
 
                     if '_L' in bundles:
                         opp_name = bundles.replace('_L', '_R')
@@ -545,7 +553,7 @@ def flip_bundle(bundle_path, root_path):
 
                     flipped_streamlines = []
                     
-                    # print("Executing flipping on x axis ...")
+                    print("Executing flipping on x axis ...")
                     for sl in streamlines:
                         sl_flipped = sl.copy()
                         sl_flipped[:, 0] = -sl_flipped[:, 0]
@@ -554,7 +562,7 @@ def flip_bundle(bundle_path, root_path):
                     
                     flipped_tractogram = StatefulTractogram.from_sft(flipped_streamlines, trk)#, ref_anat, Space.RASMM)
 
-                    # print(f"Saving bundle {bundles} for sub {sub}... ")
+                    print(f"Saving bundle {bundles} for sub {sub}... ")
 
                     original_bundle = load_tractogram(opp_path, ref_anat, bbox_valid_check=False)
                     
@@ -563,9 +571,16 @@ def flip_bundle(bundle_path, root_path):
                     save_tractogram(flipped_tractogram, f"{saving_path}/{file.replace('_32_points.trk', '_flipped.trk')}", bbox_valid_check=False)
                     print(f"Saving bundle {bundles} for sub {sub} completed")
                     
-                    print(f"Creating correspondence between flipped {bundles} and {opp_name} for sub {sub} in {set_f}")
+                    # print(f"Creating correspondence between flipped {bundles} and {opp_name} for sub {sub} in {set_f}")
 
-                    find_correspondence(root_path, flipped_tractogram, original_bundle, bundles, opp_name, sub)
+                    # dist_matrix = bundles_distances_mdf(flipped_tractogram.streamlines, original_bundle.streamlines)
+                    # matched_pairs = greedy_assignment(dist_matrix)
+
+                    # save_corr = os.path.join(root_path, 'correspondences')
+                    # os.makedirs(save_corr, exist_ok=True)
+                    # np.save(f"{save_corr}/{file.replace('_32_points.trk', f'_to_{opp_name}_matched_pairs.npy')}", matched_pairs)
+
+                    # find_correspondence(root_path, flipped_tractogram, original_bundle, bundles, opp_name, sub)
 
                     
 
@@ -624,7 +639,7 @@ def assess_correspondence(initial_path, target_path, ref_anat, csv_file):
 
 
 
-from sklearn.metrics import pairwise_distances_argmin_min
+from sklearn.metrics import pairwise_distances, pairwise_distances_argmin_min
 def dataset_reduction(path, anat, save_folder, threshold):
     # bundles_embs --> AF_L --> testset --> sub ....
     
@@ -640,7 +655,9 @@ def dataset_reduction(path, anat, save_folder, threshold):
                 for file in sorted(os.listdir(os.path.join(path, bundle, set_f, sub))):
                     print(file)
                     file_path = os.path.join(path, bundle, set_f, sub, file)
-                    if os.path.exists( os.path.join(save_folder, bundle, set_f, sub, file).replace('.trx', f'_{bundle}_REDUCED.trk')):
+                    print(os.path.join(save_folder, bundle, set_f, sub, file.replace('.trx', f'_{bundle}_REDUCED.trk')))
+                    if os.path.exists(os.path.join(save_folder, bundle, set_f, sub, file.replace('.trx', f'_{bundle}_REDUCED.trk'))):
+                        print('EXISTS')
                         continue
 
                     bundle_name = bundle.upper()
@@ -672,13 +689,30 @@ def dataset_reduction(path, anat, save_folder, threshold):
                     n_prototypes = min(len(bundle_sl), len(opposite_sl), threshold)
                     print(n_prototypes)
 
-                    agg_clustering = AgglomerativeClustering(
-                        n_clusters=n_prototypes
 
+                    # WITH AGGLOMERATIVE CLUSTERING
+                    # agg_clustering = AgglomerativeClustering(
+                    #     n_clusters=n_prototypes
+
+                    # )
+
+                    
+
+
+                    # 2. Initialize agglomerative clustering given the matrix already computed
+                    agg_clustering = AgglomerativeClustering(
+                        n_clusters=n_prototypes,
+                        metric='precomputed',
+                        linkage='average' 
                     )
 
-                    reduced_file = agg_clustering.fit_predict(emb_file)
-                    reduced_opposite = agg_clustering.fit_predict(emb_opposite)
+                    dist_matrix = pairwise_distances(emb_file, metric='euclidean', n_jobs=100)
+                    dist_matrix_opposite = pairwise_distances(emb_opposite, metric='euclidean', n_jobs=100)
+
+                    print("Matrices computed! Starting clustering...")
+
+                    reduced_file = agg_clustering.fit_predict(dist_matrix)
+                    reduced_opposite = agg_clustering.fit_predict(dist_matrix_opposite)
 
 
                     sl_b = []
@@ -731,12 +765,18 @@ def dataset_reduction(path, anat, save_folder, threshold):
 
 
 
-                    
+                    # WITH FFT
                     # print(f"Computing prototypes for {bundle_name}")
-                    # prototypes_bundle = compute_dissimilarity(emb_file, robust_euclidean, "fft", n_prototypes)
+                    # prototypes_bundle = compute_dissimilarity(emb_file, euclidean_distance, "fft", n_prototypes)
+                    # new_streamlines = file_trx.streamlines[prototypes_bundle.tolist()]
+                    # new_tractogram = StatefulTractogram.from_sft(new_streamlines, file_trx)
+
 
                     # print(f"Computing prototypes for {opposite_bundle_name}")
-                    # prototypes_opposite = compute_dissimilarity(emb_opposite, robust_euclidean, "fft", n_prototypes)
+                    # prototypes_opposite = compute_dissimilarity(emb_opposite, euclidean_distance, "fft", n_prototypes)
+                    # new_streamlines_opposite = opposite_trx.streamlines[prototypes_opposite.tolist()]
+                    # new_tractogram_opposite = StatefulTractogram.from_sft(new_streamlines_opposite, opposite_trx)
+
 
 
                     # # RANDOM
@@ -758,10 +798,13 @@ def dataset_reduction(path, anat, save_folder, threshold):
                     save_tractogram(new_tractogram_opposite, os.path.join(save_path_opposite, os.path.basename(opposite_bundle_path).replace('.trx', f'_{opposite_bundle_name}_REDUCED.trk')), bbox_valid_check=False)
                     end = perf_counter()
 
-                    
+                    txt_time = os.path.join(save_folder.replace('reduced_bundles', 'time_reduction'), sub)
+                    os.makedirs(txt_time, exist_ok=True)
                     print(f"Time for reducing bundle {bundle_name}, {opposite_bundle_name} for sub {sub}: {end-start}")
+                    with open(f'{txt_time}/{bundle_name}_{opposite_bundle_name}_time_reduction.txt', 'w') as f:
+                        f.write(f'Time for generating prototypes {end-start}')
 
-            break
+            
             
 
 
@@ -889,10 +932,11 @@ def nb_points_reduction(path, save_path, points):
                     saving_path = os.path.join(save_path, bundle, set_f, sub)
                     os.makedirs(saving_path, exist_ok=True)
 
-                    print(f"Reducing {bundle} for sub {sub} of sest {set_f} to {points} points...\n")
-                    cmd = ['scil_tractogram_resample_nb_points', '--nb_pts_per_streamline', str(points), '-f', file_path, f"{saving_path}/{file.replace('_REDUCED.trk', '_32_points.trk')}"]
-                    print("Resampling done!\n")
+                    print(f"Reducing {bundle} for sub {sub} of set {set_f} to {points} points...\n")
+                    cmd = ['scil_tractogram_resample_nb_points', '--nb_pts_per_streamline', str(points), '-f', file_path, f"{saving_path}/{file.replace('_reduced.trk', '_32_points.trk')}"]
                     subprocess.check_call(cmd, stdout=subprocess.DEVNULL)
+                    print("Resampling done!\n")
+
    
         
 
@@ -902,15 +946,17 @@ def nb_points_reduction(path, save_path, points):
 
 if __name__ == '__main__':
 
+    start_red = perf_counter()
+
     user = 'alessia.ianes'
 
     emb_path = f'/home/{user}/Desktop/data/TractoInferno_rearranged/bundles_embs'
     aligned_anat = f'/home/{user}/Desktop/data/TractoInferno_aligned/anat/testset/sub-1006/sub-1006__T1w_affine_warped.nii.gz'
-    reduced_bundles = f'/home/{user}/Desktop/data/TractoInferno_rearranged/reduced_bundles'
+    reduced_bundles = f'/home/{user}/Desktop/data/TractoInferno_rearranged/reduced_bundles_dynamic'
     os.makedirs(reduced_bundles, exist_ok=True)
     prototype_threshold = 5000
 
-    dataset_reduction(emb_path, aligned_anat, reduced_bundles, prototype_threshold)
+    # dataset_reduction(emb_path, aligned_anat, reduced_bundles, prototype_threshold)
 
     reduced_streamlines = f'/home/{user}/Desktop/data/TractoInferno_rearranged/reduced_streamlines'
     os.makedirs(reduced_streamlines, exist_ok=True)
@@ -918,17 +964,28 @@ if __name__ == '__main__':
 
     nb_points_reduction(reduced_bundles, reduced_streamlines, points)
 
+    end_red = perf_counter()
+    start_flip = perf_counter()
+
 
     flip_bundle(reduced_streamlines, f'/home/{user}/Desktop/data/TractoInferno_rearranged')
 
+    end_flip = perf_counter()
+
+
+    print("Time for resampling all streamlines of all bundles from testset:", end_red-start_red)
+    print("Time for flipping all bundles from testset:", end_flip-start_flip)
+
+
+
 
    
-    smooth_bundles = f'/home/{user}/Desktop/data/TractoInferno_rearranged/smooth_bundles'
-    os.makedirs(smooth_bundles, exist_ok=True)
+    # smooth_bundles = f'/home/{user}/Desktop/data/TractoInferno_rearranged/smooth_bundles'
+    # os.makedirs(smooth_bundles, exist_ok=True)
 
-    sigma = 3
+    # sigma = 3
 
-    smooth_bundles(reduced_bundles, smooth_bundles, sigma)
+    # smooth_bundles(reduced_bundles, smooth_bundles, sigma)
     
     
 

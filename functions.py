@@ -1,35 +1,28 @@
 import dipy
-import numpy as np
 from dipy.io.stateful_tractogram import StatefulTractogram
 import json
 from scipy.spatial import KDTree, cKDTree
-
 import numpy as np
 from scipy.spatial.distance import cdist
 
-def robust_euclidean(x, y):
-    """
-    Callable per la distanza euclidea a prova di errore dimensionale.
-    Gestisce automaticamente array 1D, slice 2D (1x32) e confronti vettoriali (Nx32).
-    """
-    # Forza entrambi gli input ad essere almeno 2D. 
-    # Un array di shape (32,) diventa automaticamente (1, 32)
-    x_2d = np.atleast_2d(x)
-    y_2d = np.atleast_2d(y)
-    
-    # Calcola la distanza con cdist (che non dà mai l'errore del "1-D array" perché lavora solo su 2D)
-    dist = cdist(x_2d, y_2d, metric='euclidean')
-    
-    # .squeeze() rimuove le dimensioni inutili.
-    # Se il risultato è una matrice (1, 1), lo converte in un semplice float scalare,
-    # esattamente ciò che la tua funzione chiamante si aspetta.
-    return dist.squeeze()
 
-# --- Come usarlo nella tua funzione originale ---
-# Ora passi "robust_euclidean" come parametro alla funzione che richiedeva il callable.
-#
-# Esempio: 
-# risultato = tua_funzione_fft(embeddings, num_punti, distance_func=robust_euclidean)
+def euclidean_distance(S_chunk: np.ndarray, ref: np.ndarray) -> np.ndarray:
+    """
+    Distanza euclidea tra ogni riga di S_chunk e il punto di riferimento ref.
+
+    Parameters
+    ----------
+    S_chunk : ndarray, shape (n, d)
+        Subset di campioni.
+    ref : ndarray, shape (1, d)
+        Punto di riferimento (singolo prototipo).
+
+    Returns
+    -------
+    ndarray, shape (n,)
+        Distanza euclidea di ogni campione da ref.
+    """
+    return np.sqrt(np.sum((S_chunk - ref) ** 2, axis=1))
 
 
 
@@ -116,5 +109,50 @@ def hausdorff_mdf(A,B) -> float:
 
     return np.minimum(direct, flipped)
 
-        
+
+
+def pairwise_mdf(
+        streamlines: np.ndarray,
+        prototypes: np.ndarray,
+) -> np.ndarray:
+    """
+    Computes the pairwise Minimum Average Direct-Flip (MDF) distance.
+
+    Args:
+        streamlines: (B, S, N, 3)
+        prototypes:  (B, P, N, 3)
+
+    Returns:
+        mdf: (B, S, P)
+    """
+    
+    # Expand dimensions for broadcasting
+    # (B, S, 1, N, 3)
+    streamlines = streamlines[:, np.newaxis, :, :]
+
+    # (B, 1, P, N, 3)
+    prototypes =  prototypes[np.newaxis, :, :, :]
+
+
+    # ---------- Forward distance ----------
+    forward = np.linalg.norm(
+        streamlines - prototypes,
+        axis=-1
+    ).mean(axis=-1)  # (B, S, P)
+
+    # ---------- Flipped distance ----------
+    prototypes_flip = np.flip(prototypes, axis=2)
+
+    backward = np.linalg.norm(
+        streamlines - prototypes_flip,
+        axis=-1
+    ).mean(axis=-1)  # (B, S, P)
+
+
+
+    # MDF
+    return np.minimum(forward, backward)
+
+
+
     
