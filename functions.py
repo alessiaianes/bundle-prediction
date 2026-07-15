@@ -5,6 +5,11 @@ from scipy.spatial import KDTree, cKDTree
 import numpy as np
 from scipy.spatial.distance import cdist
 
+import os
+from dipy.io.streamline import load_tractogram, save_tractogram
+from pprintpp import pprint
+import nibabel as nib
+
 
 def euclidean_distance(S_chunk: np.ndarray, ref: np.ndarray) -> np.ndarray:
     """
@@ -125,7 +130,7 @@ def pairwise_mdf(
     Returns:
         mdf: (B, S, P)
     """
-    
+    print(streamlines.shape)
     # Expand dimensions for broadcasting
     # (B, S, 1, N, 3)
     streamlines = streamlines[:, np.newaxis, :, :]
@@ -154,5 +159,51 @@ def pairwise_mdf(
     return np.minimum(forward, backward)
 
 
+def merge_bundles(path, sub, save_path):
+	
+    files = sorted(os.listdir(path))
+    files = [item for item in files if 'trx' in item]
+	
+    correspondeces = dict()
+    sc_correspondeces = dict()
+	
+    # bundles = [	'AF_L', 'AF_R',
+	# 			'FAT_L', 'FAT_R', 
+	# 			'ILF_L', 'ILF_R',
+	# 			'MdLF_L', 'MdLF_R', 
+	# 			'PYT_L', 'PYT_R',
+	# 			'SLF_L', 'SLF_R'
+	# 		]
+
+    bundles = [bundle.split('_matched')[0] for bundle in files]
+	
+    all_streamlines = list()
+    all_labels = list()
+	
+    total_bundles = len(bundles)
+	# total_sc_bundles = len(sub_cortical_bundles)
+    offset = 0
+    index_b = 0
+	
+    for idx, b in enumerate(bundles):
+        print(b)
+        offset += 1
+        correspondeces[idx] = b
+        sc_correspondeces[idx] = b
+        trx_file = [item for item in files][idx]
+
+        print(trx_file)
+        sft = load_tractogram(os.path.join(path, trx_file), reference='same')
+        all_streamlines.extend(list(sft.streamlines))
+        labels = [idx] * len(sft.streamlines)
+        all_labels.extend(labels)
+		
+        if idx == total_bundles - 1:
+            merged_atlas = StatefulTractogram.from_sft(all_streamlines, sft)
+          
+            save_tractogram(merged_atlas, f'{save_path}/{sub}_merged.trx')
+            np.save(f'{save_path}/{sub}_labels.npy', np.array(all_labels))
+            with open(f'{save_path}/{sub}_correspondences.json', 'w') as target:
+                json.dump(correspondeces, target)
 
     

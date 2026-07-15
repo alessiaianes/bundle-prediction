@@ -389,7 +389,25 @@ def generate_embs(config):
 
 
 
-   
+# def create_sub_folder(path):
+#     for bundle in os.listdir(path):
+#         bundle_path = os.path.join(path, bundle)
+#         for set_f in os.listdir(bundle_path):
+#             set_path = os.path.join(bundle_path, set_f)
+#             for sub in os.listdir(set_path):
+#                 sub_path = os.path.join(set_path, sub)
+#                 for file in os.listdir(sub_path):
+#                     if not file.endswith('.trx'):
+#                         continue
+#                     file_path = os.path.join(sub_path, file)
+
+#                     new_folder = '/home/alessia/Desktop/data/Tractoinferno_subjects'
+#                     os.makedirs(new_folder, exist_ok=True)
+
+#                     dst = os.path.join(new_folder, set_f, sub)
+#                     os.makedirs(dst, exist_ok=True)
+
+#                     shutil.copy(file_path, dst)
     
 
 
@@ -422,7 +440,9 @@ if __name__ ==  '__main__':
     # check_length(f'/home/{user}/Desktop/data/TractoInferno_rearranged/bundles/FAT_R/validset')
 
 
-    generate_embs(f'/home/{user}/project/streamline_autoencoder/checkpoints/train_eclipse/train_eclipse')
+    # generate_embs(f'/home/{user}/project/streamline_autoencoder/checkpoints/train_eclipse/train_eclipse')
+
+
 
 
         

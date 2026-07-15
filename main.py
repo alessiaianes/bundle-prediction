@@ -938,54 +938,79 @@ def nb_points_reduction(path, save_path, points):
                     print("Resampling done!\n")
 
    
-        
+def merging(path, user):
+    # for bundle in os.listdir(path):
+    #     bundle_path = os.path.join(path, bundle)
+    for set_f in os.listdir(path):
+        set_path = os.path.join(path, set_f)
+        for sub in os.listdir(set_path):
+            sub_path = os.path.join(set_path, sub)
+            saving_folder = f'/home/{user}/Desktop/data/TractoInferno_subjects/{set_f}/{sub}'
+            os.makedirs(saving_folder, exist_ok=True)
+            merge_bundles(sub_path, sub, saving_folder)
+                # for file in os.listdir(sub_path):
+                #     if not file.endswith('.trx'):
+                #         continue
+                #     file_path = os.path.join(sub_path, file)
+
+                #     new_folder = '/home/alessia/Desktop/data/Tractoinferno_subjects'
+                #     os.makedirs(new_folder, exist_ok=True)
+
+                #     dst = os.path.join(new_folder, set_f, sub)
+                #     os.makedirs(dst, exist_ok=True)       
 
 
-
+from reduce_bundle import reduce
 
 
 if __name__ == '__main__':
 
-    start_red = perf_counter()
 
     user = 'alessia.ianes'
 
-    emb_path = f'/home/{user}/Desktop/data/TractoInferno_rearranged/bundles_embs'
-    aligned_anat = f'/home/{user}/Desktop/data/TractoInferno_aligned/anat/testset/sub-1006/sub-1006__T1w_affine_warped.nii.gz'
+    # emb_path = f'/home/{user}/Desktop/data/TractoInferno_rearranged/bundles_embs'
+    # aligned_anat = f'/home/{user}/Desktop/data/TractoInferno_aligned/anat/testset/sub-1006/sub-1006__T1w_affine_warped.nii.gz'
+    
+
+
+    # ====== 1. Reduce number of streamlines
+    prototype_threshold = 5000
+    path_bundles = f'/home/{user}/Desktop/data/TractoInferno_rearranged/bundles'
     reduced_bundles = f'/home/{user}/Desktop/data/TractoInferno_rearranged/reduced_bundles_dynamic'
     os.makedirs(reduced_bundles, exist_ok=True)
-    prototype_threshold = 5000
 
-    # dataset_reduction(emb_path, aligned_anat, reduced_bundles, prototype_threshold)
+    # reduce(user, path_bundles, reduced_bundles)
+
+    # ====== 2. Resampling number of points per streamline
 
     reduced_streamlines = f'/home/{user}/Desktop/data/TractoInferno_rearranged/reduced_streamlines'
     os.makedirs(reduced_streamlines, exist_ok=True)
     points = 32
-
-    nb_points_reduction(reduced_bundles, reduced_streamlines, points)
-
-    end_red = perf_counter()
-    start_flip = perf_counter()
+    
+    # nb_points_reduction(reduced_bundles, reduced_streamlines, points)
 
 
-    flip_bundle(reduced_streamlines, f'/home/{user}/Desktop/data/TractoInferno_rearranged')
-
-    end_flip = perf_counter()
-
-
-    print("Time for resampling all streamlines of all bundles from testset:", end_red-start_red)
-    print("Time for flipping all bundles from testset:", end_flip-start_flip)
+    # ====== 3. Flip bundles to prepare data for correspondence check
+    # flip_bundle(reduced_streamlines, f'/home/{user}/Desktop/data/TractoInferno_rearranged')
 
 
 
+    # ====== 4. Check correspondence
+    # ADD FUNCTION TO CONNECT TO MATCHING.PY
 
+
+    # ====== 5. Merging trx per subject
+    merging(f'/home/{user}/Desktop/data/TractoInferno_rearranged/match_mdf_trx', user)
+
+
+    # ====== 6. Smoothin bundles
    
-    # smooth_bundles = f'/home/{user}/Desktop/data/TractoInferno_rearranged/smooth_bundles'
-    # os.makedirs(smooth_bundles, exist_ok=True)
+    # smooth_bundles_folder = f'/home/{user}/Desktop/data/TractoInferno_rearranged/smooth_bundles'
+    # os.makedirs(smooth_bundles_folder, exist_ok=True)
 
     # sigma = 3
 
-    # smooth_bundles(reduced_bundles, smooth_bundles, sigma)
+    # smooth_bundles(reduced_bundles, smooth_bundles_folder, sigma)
     
     
 

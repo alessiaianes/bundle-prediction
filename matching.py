@@ -466,29 +466,39 @@ def match_bundles(
     }
 
 
-# ---------------------------------------------------------------------------
-# Esempio d'uso
-# ---------------------------------------------------------------------------
+def save_results(rows, cols, match, folder, filename):
+    res = []
+    for i in range(len(match)):
+        res.append((rows[i], cols[i], match[i]))
+
+    print("Saving results...")
+    os.makedirs(folder, exist_ok=True)
+    np.save(f"{folder}/{filename}.npy", res)
+
+
 
 if __name__ == "__main__":
     from time import perf_counter
 
     start = perf_counter()
     user = 'alessia.ianes'
-    path_sl = f'/home/{user}/Desktop/data/TractoInferno_rearranged/reduced_streamlines_embs'
-    path_flip = f'/home/{user}/Desktop/data/TractoInferno_rearranged/flip_bundles_embs'
+    path_sl = f'/home/{user}/Desktop/data/TractoInferno_rearranged/reduced_streamlines'
+    path_flip = f'/home/{user}/Desktop/data/TractoInferno_rearranged/flip_bundles'
     # save_trk = f'/home/{user}/Desktop/data/TractoInferno_rearranged/graph_match_trk'
     mdf_threshold = 10.0
-    path_set = f'/home/{user}/Desktop/data/TractoInferno_rearranged/match_euclidean_mdf_threshold/testset'
+    # path_set = f'/home/{user}/Desktop/data/TractoInferno_rearranged/match_euclidean_mdf_threshold/testset'
     for bundle in sorted(os.listdir(path_sl)):
+      
         
         if bundle.endswith('_L'):
             bundle_opp = bundle.replace('_L', '_R')
         elif bundle.endswith('_R'):
             bundle_opp = bundle.replace('_R', '_L')
         for set_f in sorted(os.listdir(os.path.join(path_sl, bundle))):
+            if set_f != 'testset':
+                continue
             for sub in sorted(os.listdir(os.path.join(path_sl, bundle, set_f))):
-                if '1006' not in sub:
+                if sub not in ['sub-1006', 'sub-1019', 'sub-1024','sub-1046','sub-1047']:
                     continue
                 for file in os.listdir(os.path.join(path_sl, bundle, set_f, sub)):
                     
@@ -501,17 +511,19 @@ if __name__ == "__main__":
                     # os.makedirs(saving_path, exist_ok=True)
 
 
-                    # # =======
-                    # sl_a, sft_a = load_bundle(path_file)
-                    # sl_b, sft_b = load_bundle(path_opp)
-
-                    # emb_a = np.array(sft_a.data_per_streamline['embeddings']).astype(np.float32)
-                    # emb_b = np.array(sft_b.data_per_streamline['embeddings']).astype(np.float32)
-
-                    # print("emb_a shape:", emb_a.shape)
-                    # print("emb_b shape:", emb_b.shape)
+                    
 
                     
+                    # # ========== KD TREE + NORMALIZATION ==========
+
+                    # # sl_a, sft_a = load_bundle(path_file)
+                    # # sl_b, sft_b = load_bundle(path_opp)
+
+                    # # emb_a = np.array(sft_a.data_per_streamline['embeddings']).astype(np.float32)
+                    # # emb_b = np.array(sft_b.data_per_streamline['embeddings']).astype(np.float32)
+
+                    # # print("emb_a shape:", emb_a.shape)
+                    # # print("emb_b shape:", emb_b.shape)
 
                     # # norm_a = emb_a / np.linalg.norm(emb_a, axis=1, keepdims=True)
                     # # norm_b = emb_b / np.linalg.norm(emb_b, axis=1, keepdims=True)
@@ -527,6 +539,38 @@ if __name__ == "__main__":
                     # # row_ind, col_ind = linear_sum_assignment(distances)
                     # # col_ind_oiginal = indices[row_ind, col_ind]
 
+                    # # print("row_ind:", row_ind[:10])
+                    # # print("col_ind:", col_ind[:10])
+
+                 
+
+
+                    # # print("Saving results...")
+                    # # match_folder = 'match_KDTree'
+                    # # save_results(rwo_ind, col_ind, col_ind_original, f"/home/{user}/Desktop/data/TractoInferno_rearranged/{match_folder}/{set_f}/{sub}", f"{bundle_opp}_to_{bundle}_matched_pairs")
+
+
+                    # # match_trk = f"/home/{user}/Desktop/data/TractoInferno_rearranged/{match_folder}_trk/{set_f}/{sub}"
+                    # # os.makedirs(match_trk, exist_ok=True)
+                    # # save_bundle(np.array(sl_b)[col_ind], sft_b, f"{match_trk}/{bundle_opp}_to_{bundle}_32_points.trk")
+
+
+
+
+
+
+                    # # ========== COSINE DISTANCE ==========
+                    # print(f"Loading bundles {bundle} and flipped {bundle_opp} for sub {sub}...")
+                    # sl_a, sft_a = load_bundle(path_file)
+                    # sl_b, sft_b = load_bundle(path_opp)
+
+                    # emb_a = np.array(sft_a.data_per_streamline['embeddings']).astype(np.float32)
+                    # emb_b = np.array(sft_b.data_per_streamline['embeddings']).astype(np.float32)
+
+                    # print("emb_a shape:", emb_a.shape)
+                    # print("emb_b shape:", emb_b.shape)
+
+
                     # cos_dist = cosine_distances(emb_a, emb_b)
                     # print("cos_dist shape:", cos_dist.shape)
 
@@ -537,6 +581,57 @@ if __name__ == "__main__":
                     # print("row_ind:", row_ind[:10])
                     # print("col_ind:", col_ind[:10])
                     # print("distances:", match_dist[:10])
+
+                 
+                   
+
+
+                    # print("Saving results...")
+                    # match_folder = 'match_cosine'
+                    # # save_results(row_ind, col_ind, match_dist, f"/home/{user}/Desktop/data/TractoInferno_rearranged/{match_folder}/{set_f}/{sub}", f"{bundle_opp}_to_{bundle}_matched_pairs")
+
+
+                    # # match_trk = f"/home/{user}/Desktop/data/TractoInferno_rearranged/{match_folder}_trk/{set_f}/{sub}"
+                    # # os.makedirs(match_trk, exist_ok=True)
+                    # # save_bundle(np.array(sl_b)[col_ind], sft_b, f"{match_trk}/{bundle_opp}_to_{bundle}_32_points.trk")
+
+                    
+                    # # # ==== TRYING INCORPORATING RESAMPLING + MDF IN COSINE METHOD ====
+
+                    # new_sl_a = resample_streamlines(sl_a, n_points=16)
+                    # new_sl_b = resample_streamlines(sl_b, n_points=16)
+
+                    # matched_streamlines_a = np.array(new_sl_a)[row_ind]
+                    # matched_streamlines_b = np.array(new_sl_b)[col_ind]
+
+                    # mdf_dist = pairwise_mdf(new_sl_a, new_sl_b)
+                    # mdf_diag = np.diag(mdf_dist)
+
+                    
+                    # print("Matches:", mdf_diag[:10])
+
+
+                    # valid = mdf_diag <= 10.0
+                    # print(f"Valid matched {valid.sum()}/{len(valid)}")
+
+                    # rows = row_ind[valid]
+                    # cols = col_ind[valid]
+                    # match_dist = mdf_diag[valid]
+
+                    # print("rows:", rows[:10])
+                    # print("cols:", cols[:10])
+                    # print("match < 10mm:", match_dist[:10])
+
+
+                    # print("Distances mm:", match_dist[:10])
+
+                    # save_results(rows, cols, match_dist, f"/home/{user}/Desktop/data/TractoInferno_rearranged/{match_folder}/{set_f}/{sub}", f"{bundle_opp}_to_{bundle}_matched_pairs")
+
+
+
+
+                    
+
 
 
 
@@ -556,22 +651,34 @@ if __name__ == "__main__":
                     sl_a, sft_a = load_bundle(path_file)
                     sl_b, sft_b = load_bundle(path_opp)
 
-                    print(f"Resampling streamlines to 16 points...")
-                    new_sl_a = resample_streamlines(sl_a, n_points=16)
-                    new_sl_b = resample_streamlines(sl_b, n_points=16)
 
-                    flip_folder = os.path.join(f'/home/{user}/Desktop/data/TractoInferno_rearranged/flip_bundle_16_points', bundle_opp, set_f, sub)
-                    os.makedirs(flip_folder, exist_ok=True)
-                    reducing_16 = os.path.join(f'/home/{user}/Desktop/data/TractoInferno_rearranged/reduced_streamlines_16_points', bundle, set_f, sub)
-                    os.makedirs(reducing_16, exist_ok=True)
-                    save_bundle(new_sl_a, sft_a, f"{reducing_16}/{bundle}_16_points.trk")
-                    save_bundle(new_sl_b, sft_b, f"{flip_folder}/{bundle_opp}_flipped_16_points.trk")
+                    # emb_a = np.array(sft_a.data_per_streamline['embeddings'])
+                    # emb_b = np.array(sft_b.data_per_streamline['embeddings'])
+
+                    # print(emb_a.shape)
+
+                    # print(f"Resampling streamlines to 16 points...")
+                    # new_sl_a = resample_streamlines(sl_a, n_points=16)
+                    # new_sl_b = resample_streamlines(sl_b, n_points=16)
+
+                    # flip_folder = os.path.join(f'/home/{user}/Desktop/data/TractoInferno_rearranged/flip_bundle_16_points', bundle_opp, set_f, sub)
+                    # os.makedirs(flip_folder, exist_ok=True)
+                    # reducing_16 = os.path.join(f'/home/{user}/Desktop/data/TractoInferno_rearranged/reduced_streamlines_16_points', bundle, set_f, sub)
+                    # os.makedirs(reducing_16, exist_ok=True)
+                    # save_bundle(new_sl_a, sft_a, f"{reducing_16}/{bundle}_16_points.trk")
+                    # save_bundle(new_sl_b, sft_b, f"{flip_folder}/{bundle_opp}_flipped_16_points.trk")
 
 
 
 
                     print("Computing distances using pairwise mdf...")
-                    distances = pairwise_mdf(new_sl_a, new_sl_b)
+                    # distances = pairwise_mdf(new_sl_a, new_sl_b)
+                    distances = pairwise_mdf(np.array(sl_a), np.array(sl_b))
+                    # distances = pairwise_mdf(emb_a[:, :, np.newaxis], emb_b[:, :, np.newaxis])
+
+                    # print(distances[:5])
+
+
 
                     print("Checking 1-1 match....")
                     row_ind, col_ind = linear_sum_assignment(distances)
@@ -584,7 +691,7 @@ if __name__ == "__main__":
                     else:
                         valid = np.ones(len(col_ind), dtype=bool)
 
-                  
+           
 
                     match_final = matched_pairs[valid]
                     rows = row_ind[valid]
@@ -594,17 +701,46 @@ if __name__ == "__main__":
                     for i in range(len(match_final)):
                         res.append((rows[i], cols[i], match_final[i]))
 
-
+                    len(match_final)
                     print("Saving results...")
-                    match_folder = f"/home/{user}/Desktop/data/TractoInferno_rearranged/match_euclidean_mdf_threshold/{set_f}/{sub}"
-                    os.makedirs(match_folder, exist_ok=True)
-                    np.save(f"{match_folder}/{bundle_opp}_to_{bundle}_matched_pairs.npy", res)
+                    match_folder = 'match_mdf'
+                    save_results(rows, cols, match_final, f"/home/{user}/Desktop/data/TractoInferno_rearranged/{match_folder}/{set_f}/{sub}", f"{bundle_opp}_to_{bundle}_matched_pairs")
 
-
+                    print(len(sl_a))
+                    print(np.array(sl_a).shape)
                     # matched_streamlines = new_sl_b[valid]
-                    match_trk = f"/home/{user}/Desktop/data/TractoInferno_rearranged/match_trk/{set_f}/{sub}"
+                    matched_streamlines = np.array(sl_b)[valid]
+                    out_sft = StatefulTractogram.from_sft(
+                        np.array(sl_a)[valid],
+                        sft_a,
+                        # space=Space.RASMM,
+                    )
+                   
+                    out_sl = np.array([np.array(sl) for sl in matched_streamlines])
+                    compress = out_sl.reshape(out_sl.shape[0], -1)
+
+                    # # to get original array
+                    # # sft.data_per_streamline['match']
+                    # # original = sft.reshape[-1, 32, 3]
+                  
+                    out_sft.data_per_streamline['match'] = compress
+                    # out_sft.data_per_streamline['embeddings'] = sft_a.data_per_streamline['embeddings'][valid]  
+                    trx_folder = f"/home/{user}/Desktop/data/TractoInferno_rearranged/{match_folder}_trx/{set_f}/{sub}"
+                    os.makedirs(trx_folder, exist_ok=True)     
+                    save_tractogram(out_sft, f"{trx_folder}/{bundle}_matched.trx", bbox_valid_check=False)
+
+                  
+
+      
+                    
+                  
+
+
+                    match_trk = f"/home/{user}/Desktop/data/TractoInferno_rearranged/{match_folder}_trk/{set_f}/{sub}"
                     os.makedirs(match_trk, exist_ok=True)
-                    save_bundle(np.array(sl_b)[col_ind], sft_b, f"{match_trk}/{bundle_opp}_to_{bundle}_16_points.trk")
+                    save_bundle(matched_streamlines, sft_b, f"{match_trk}/{bundle_opp}_to_{bundle}_32_points.trk")
+
+
 
             
 
