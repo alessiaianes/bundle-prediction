@@ -167,6 +167,8 @@ from dipy.io.stateful_tractogram import StatefulTractogram, Space
 from dipy.io.streamline import save_tractogram
 import os
 
+
+
 def reduce(user, path, red_path):
     start = perf_counter()
 
@@ -238,81 +240,3 @@ def reduce(user, path, red_path):
             
             end = perf_counter()
             print(f"Time: {end - start}")
-
-# if __name__ == "__main__":
-#     start = perf_counter()
-
-#     user = 'alessia.ianes'
-#     path = f'/home/{user}/Desktop/data/TractoInferno_rearranged/bundles'
-#     red_path = f'/home/{user}/Desktop/data/TractoInferno_rearranged/reduced_bundles_dynamic'
-    
-
-
-#     for bundle in sorted(os.listdir(path)):
-#         if 'AF' not in bundle:
-#             continue
-#         bundle_path = os.path.join(path, bundle)
-#         red_bundle_path_a = os.path.join(red_path, bundle)
-#         red_bundle_path_b = os.path.join(red_path, bundle.replace('_L', '_R') if '_L' in bundle else bundle.replace('_R', '_L'))
-#         os.makedirs(red_bundle_path_a, exist_ok=True)
-#         os.makedirs(red_bundle_path_b, exist_ok=True)
-
-#         opp_path = os.path.join(path, bundle.replace('_L', '_R') if '_L' in bundle else bundle.replace('_R', '_L'))
-
-#         for set_f in sorted(os.listdir(bundle_path)):
-#             if set_f != 'testset':
-#                 continue
-#             set_path = os.path.join(bundle_path, set_f)
-
-#             for sub in sorted(os.listdir(set_path)):
-#                 sub_path = os.path.join(set_path, sub)
-
-#                 for file in os.listdir(sub_path):
-#                     if not file.endswith('.trk') or os.path.exists(os.path.join(red_bundle_path_a, set_f, sub, f'{sub}__{bundle}_reduced.trk')):
-#                         continue
-                    
-#                     path_file = os.path.join(sub_path, file)
-
-#                     # opp_name = file.replace('_32_points.trk', '_opp_32_points.trk')
-#                     path_opp = [os.path.join(opp_path, set_f, sub, f) for f in os.listdir(os.path.join(opp_path, set_f, sub))][0]
-
-#                     if not os.path.exists(path_opp):
-#                         print(f"Opposite bundle not found for {file}. Skipping.")
-#                         continue
-
-#                     print(f"\nProcessing {file} and its opposite {bundle.replace('_L', '_R') if '_L' in bundle else bundle.replace('_R', '_L')}...")
-                    
-#                     # Carichi i due fasci originali
-#                     streamlines_a, sft_a = load_bundle(path_file)
-#                     streamlines_b, sft_b = load_bundle(path_opp)
-
-#                     # Riduci entrambi i fasci allo stesso identico numero di streamlines
-#                     streamlines_a_reduced = reduce_bundle_hybrid_dynamic(streamlines_a, streamlines_b, reduce_a=True)
-#                     streamlines_b_reduced = reduce_bundle_hybrid_dynamic(streamlines_a, streamlines_b, reduce_a=False)
-
-#                     out_folder_a = os.path.join(red_bundle_path_a, set_f, sub)
-#                     out_folder_b = os.path.join(red_bundle_path_b, set_f, sub)
-
-#                     os.makedirs(out_folder_a, exist_ok=True)
-#                     os.makedirs(out_folder_b, exist_ok=True)
-
-#                     # Definiamo i nomi dei nuovi file trk
-#                     name_reduced_a = f'{sub}__{bundle}_reduced.trk'
-#                     name_reduced_b = f"{sub}__{bundle.replace('_L', '_R') if bundle.endswith('_L') else bundle.replace('_R', '_L')}_reduced.trk"
-
-                    
-#                     path_reduced_a = os.path.join(out_folder_a, name_reduced_a)
-#                     path_reduced_b = os.path.join(out_folder_b, name_reduced_b)
-
-#                     # Salviamo i file ereditando le informazioni geometriche corrette (sft_a e sft_b)
-#                     save_bundle(streamlines_a_reduced, sft_a, path_reduced_a)
-#                     save_bundle(streamlines_b_reduced, sft_b, path_reduced_b)
-            
-#             end = perf_counter()
-#             print(f"Time: {end - start}")
-
-    
-            
-            
-    # Ora puoi lanciare il matching sulle versioni ridotte (e bilanciate)
-    # (Dovrai solo modificare leggermente match_bundles per accettare direttamente le liste di streamlines invece dei path, o salvarle temporaneamente)

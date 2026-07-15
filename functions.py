@@ -11,24 +11,6 @@ from pprintpp import pprint
 import nibabel as nib
 
 
-def euclidean_distance(S_chunk: np.ndarray, ref: np.ndarray) -> np.ndarray:
-    """
-    Distanza euclidea tra ogni riga di S_chunk e il punto di riferimento ref.
-
-    Parameters
-    ----------
-    S_chunk : ndarray, shape (n, d)
-        Subset di campioni.
-    ref : ndarray, shape (1, d)
-        Punto di riferimento (singolo prototipo).
-
-    Returns
-    -------
-    ndarray, shape (n,)
-        Distanza euclidea di ogni campione da ref.
-    """
-    return np.sqrt(np.sum((S_chunk - ref) ** 2, axis=1))
-
 
 
 def initialization(bundle_path, streamline_path):
@@ -60,60 +42,6 @@ def divide_in_bundles(gt, obj, file, names):
 
 
         dipy.io.streamline.save_tractogram(sft_gt, f'{file}/{names[label]}.trk', bbox_valid_check=False) #bbox_valid_check = false for HCP
-
-
-
-def directed_hausdorff(A,B, flip=False) -> float:
-    if flip:
-        B = [item[::-1] for item in B]
-
-    # mat_dist = np.zeros((len(A), len(B)))
-       
-
-    # for i, lineB in enumerate(B):
-    #     treeB = KDTree(lineB)
-    #     for j, lineA in enumerate(A):
-    #         dist, _ = treeB.query(lineA, k=1)
-    #         mat_dist[j, i] = dist.min()
-
-
-    # return mat_dist
-
-    """
-    Calcola la distanza diretta vettorizzando le query spaziali su tutto il set A.
-    """
-    # 1. Uniamo tutte le linee di A in un unico array (N_totali, dimensioni)
-    A_flat = np.vstack(A)
-    
-    # 2. Prepariamo gli array per il "raggruppamento" veloce dei risultati
-    lens_A = np.array([len(lineA) for lineA in A])
-    # Troviamo gli indici di partenza di ogni linea dentro A_flat
-    # Es: lunghezze [10, 20, 5] -> indici [0, 10, 30]
-    indices_A = np.insert(np.cumsum(lens_A), 0, 0)[:-1]
-    
-    mat_dist = np.zeros((len(A), len(B)))
-    
-    # 3. Pre-costruiamo gli alberi per B
-    trees_B = [cKDTree(lineB) for lineB in B]
-    
-    # 4. Cicliamo solo su B. Il ciclo su A è sparito (completamente vettorizzato)
-    for i, treeB in enumerate(trees_B):
-        # Facciamo la query di TUTTI i punti di A in un colpo solo
-        # n_jobs=-1 usa tutti i core della CPU per questa singola operazione
-        dists, _ = treeB.query(A_flat, k=1, workers=-1)
-        
-        mat_dist[:, i] = np.minimum.reduceat(dists, indices_A)
-            
-    return mat_dist
-
-
-def hausdorff_mdf(A,B) -> float:
-
-    direct = directed_hausdorff(A, B)
-    flipped = directed_hausdorff(A, B, flip=True)
-
-    return np.minimum(direct, flipped)
-
 
 
 def pairwise_mdf(
@@ -167,13 +95,7 @@ def merge_bundles(path, sub, save_path):
     correspondeces = dict()
     sc_correspondeces = dict()
 	
-    # bundles = [	'AF_L', 'AF_R',
-	# 			'FAT_L', 'FAT_R', 
-	# 			'ILF_L', 'ILF_R',
-	# 			'MdLF_L', 'MdLF_R', 
-	# 			'PYT_L', 'PYT_R',
-	# 			'SLF_L', 'SLF_R'
-	# 		]
+
 
     bundles = [bundle.split('_matched')[0] for bundle in files]
 	
@@ -181,9 +103,7 @@ def merge_bundles(path, sub, save_path):
     all_labels = list()
 	
     total_bundles = len(bundles)
-	# total_sc_bundles = len(sub_cortical_bundles)
     offset = 0
-    index_b = 0
 	
     for idx, b in enumerate(bundles):
         print(b)
