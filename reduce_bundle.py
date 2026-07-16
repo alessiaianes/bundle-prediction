@@ -1,102 +1,115 @@
 from time import perf_counter
 
 import numpy as np
-from sklearn.cluster import MiniBatchKMeans
+from sklearn.cluster import MiniBatchKMeans, AgglomerativeClustering
 from scipy.spatial.distance import cdist
+from sklearn.metrics import pairwise_distances
+
+
+from dipy.tracking.streamline import set_number_of_points
+from dipy.io.streamline import save_tractogram
+
+
+from matching import load_bundle
+from dipy.io.stateful_tractogram import StatefulTractogram
+import os
 
 def reduce_bundle_kmeans(streamlines, n_target_streamlines=1000):
     """
-    Riduce un fascio a n_target_streamlines scegliendole il più 
-    spazialmente distanti e rappresentative possibile.
+    Reduce a bundle to n_target_streamlines choosing them
+    as far and representative as possible.
     """
     if len(streamlines) <= n_target_streamlines:
         return streamlines
-
-    # 1. Calcola l'embedding (i 15 numeri) per tutte le fibre
-    embeddings = []
-    for s in streamlines:
-        s = np.asarray(s, dtype=np.float32)
-        mid = s[len(s) // 2]
-        centroid = s.mean(axis=0)
-        std = s.std(axis=0)
-        embeddings.append(np.concatenate([centroid, s[0], s[-1], mid, std]))
     
-    embeddings = np.array(embeddings, dtype=np.float32)
 
-    # 2. Clustering ultra-veloce con MiniBatchKMeans
-    # MiniBatch è una versione ottimizzata di KMeans per fare molto prima
+    sl_res = set_number_of_points(streamlines, 32)
+
+    matrix = np.array([sl.flatten() for sl in sl_res], dtype=np.float32)
+
+    # 1. "Fast" clustering with MiniBatchKMeans
     kmeans = MiniBatchKMeans(n_clusters=n_target_streamlines, random_state=42, n_init="auto")
-    kmeans.fit(embeddings)
+    kmeans.fit(matrix)
     
-    # 3. Per ogni centroide (gruppo), trova la fibra reale più vicina
-    # Calcola la distanza tra tutti gli embeddings e i centroidi del K-Means
-    distances = cdist(kmeans.cluster_centers_, embeddings, metric='euclidean')
+    # 2. For each centroid, look for the nearest real streamline.
+    # Compute distance among every streamline and centroid of K-Means
+    distances = cdist(kmeans.cluster_centers_, matrix, metric='euclidean')
     
-    # Prendi l'indice della fibra con la distanza minima per ogni cluster
+    # 3. Take the index of the streamline with the minimum distance for each cluster
     representative_indices = np.argmin(distances, axis=1)
     
-    # Estrai le fibre finali (e assicurati che non ci siano duplicati)
+    # 4. Extract final streamlines
     unique_indices = np.unique(representative_indices)
     reduced_streamlines = [streamlines[i] for i in unique_indices]
 
     return reduced_streamlines
 
 
-import numpy as np
-from sklearn.cluster import AgglomerativeClustering
-from scipy.spatial.distance import cdist
+
 
 def reduce_bundle_agglomerative(streamlines, n_target_streamlines=1000):
     """
-    Riduce un fascio usando Agglomerative Clustering.
-    Attenzione: molto lento se len(streamlines) > 15.000.
+    Reduce a bundle using Agglomerative Clustering.
     """
     if len(streamlines) <= n_target_streamlines:
         return streamlines
 
-    # 1. Calcola l'embedding (i 15 numeri) per tutte le fibre
-    embeddings = []
-    for s in streamlines:
-        s = np.asarray(s, dtype=np.float32)
-        mid = s[len(s) // 2]
-        centroid = s.mean(axis=0)
-        std = s.std(axis=0)
-        embeddings.append(np.concatenate([centroid, s[0], s[-1], mid, std]))
-    
-    embeddings = np.array(embeddings, dtype=np.float32)
 
-    # 2. Clustering Agglomerativo
-    # 'ward' è il linkage migliore perché minimizza la varianza nei gruppi
-    agglo = AgglomerativeClustering(n_clusters=n_target_streamlines, linkage='ward')
-    labels = agglo.fit_predict(embeddings)
+    sl_res = set_number_of_points(streamlines, 32)
+    matrix = np.array([sl.flatten() for sl in sl_res], dtype=np.float32)
+
+
+    # 1. Initializing clustering
     
-    # 3. Trova la fibra rappresentativa per ogni cluster
+    agglo = AgglomerativeClustering(n_clusters=n_target_streamlines, linkage='ward')
+    labels = agglo.fit_predict(matrix)
+
+
+    
+    dist_matrix = pairwise_distances(matrix, metric='euclidean', n_jobs=32)
+
+    print("Matrix computed! Starting clustering...")
+
+
+    # 2. Initialize agglomerative clustering given the matrix already computed
+    agg_clustering = AgglomerativeClustering(
+        n_clusters=n_target_streamlines,
+        metric='precomputed',
+        linkage='average' 
+    )
+
+    labels = agg_clustering.fit_predict(dist_matrix)
+
+
+
+
+    # 2. Look for the most representative streamline for each cluster
     representative_indices = []
     
     for cluster_id in range(n_target_streamlines):
-        # Prendi gli indici di tutte le fibre che sono finite in questo cluster
+        # Take the indexes of all streamlines of clusetr "cluster_id"
         points_in_cluster_idx = np.where(labels == cluster_id)[0]
         
-        # Se il cluster ha una sola fibra, prendi quella
+       
         if len(points_in_cluster_idx) == 1:
             representative_indices.append(points_in_cluster_idx[0])
             continue
             
-        # Estrai i vettori di queste fibre
-        cluster_embeddings = embeddings[points_in_cluster_idx]
+        # Extract streamlines for those indexes
+        cluster_embeddings = matrix[points_in_cluster_idx]
         
-        # Calcola il centroide "virtuale" facendone la media
+        # Compute "virtual" centroid (mean)
         cluster_center = cluster_embeddings.mean(axis=0, keepdims=True)
         
-        # Trova quale fibra del cluster è più vicina al centroide
+        # Look for the nearest streamline to the centroid
         dists = cdist(cluster_center, cluster_embeddings, metric='euclidean')
         local_best_idx = np.argmin(dists)
         
-        # Risali all'indice originale della fibra e salvalo
+        # Save the streamlines indexes
         global_best_idx = points_in_cluster_idx[local_best_idx]
         representative_indices.append(global_best_idx)
 
-    # 4. Estrai le fibre finali
+    # 3. Extract the streamlines
     reduced_streamlines = [streamlines[i] for i in representative_indices]
 
     return reduced_streamlines
@@ -107,136 +120,161 @@ import numpy as np
 
 def reduce_bundle_hybrid_dynamic(streamlines_a, streamlines_b, reduce_a=True):
     """
-    Riduce il fascio applicando il vincolo dinamico:
+    Reduce bundle apllying dynamic constraint:
     target = min(len(A), len(B), 5000)
     
-    Se reduce_a=True riduce il fascio A, altrimenti riduce il fascio B.
+    If reduce_a=True bundle A is reduced, otherwise bundle B.
     """
     len_a = len(streamlines_a)
     len_b = len(streamlines_b)
     
-    # 1. Calcolo del target dinamico secondo la tua regola
+    # 1. Compute how many streamlines to keep (the minimum among 5000, the number of streamlines of A and the number of streamlines of B)
     target_final = min(len_a, len_b, 5000)
     
-    # Seleziona quale dei due fasci stiamo riducendo in questa chiamata
+    # Select which bundle to reduce
+    current_streamlines = streamlines_a if reduce_a else streamlines_b
+
     current_streamlines = streamlines_a if reduce_a else streamlines_b
     total_current = len(current_streamlines)
     
-    print(f"\n--- Riduzione Fascio (Iniziali: {total_current}) ---")
-    print(f"  Target finale calcolato: {target_final}")
+    print(f"\n--- Reducing bundle (Initial number of streamlines: {total_current}) ---")
+    print(f"  Streamlines to look for: {target_final}")
     
-    # Se il fascio ha già meno fibre del target, non c'è nulla da ridurre
+  
     if total_current <= target_final:
-        print("  Il fascio ha già un numero di fibre inferiore o uguale al target. Salto riduzione.")
+        print("  The bundle has a number of streamlines already under target. Therefore we skip reduction.")
         return current_streamlines
 
-    # 2. Gestione della pipeline in base alla mole di dati
-    # Impostiamo un target intermedio per il K-Means (es. 15.000 fibre)
+    # 2. Manage the pipeline
+    # We fix a target to reduce the number of streamlines from original to k-means, so that agglomerative clustering will take less
     target_intermediate = 10000
     
     if total_current > target_intermediate:
-        # Dataset enorme (centinaia di migliaia): serve la fase 1 col K-Means
-        print(f"  [Fase 1] Dataset enorme. K-Means veloce: {total_current} -> {target_intermediate} fibre")
+        print(f"  [Phase 1] K-Means: {total_current} -> {target_intermediate} streamlines")
         intermediate_streamlines = reduce_bundle_kmeans(current_streamlines, n_target_streamlines=target_intermediate)
         
-        print(f"  [Fase 2] Agglomerativo di precisione: {target_intermediate} -> {target_final} fibre")
+        print(f"  [Phase 2] Agglomerative clustering: {target_intermediate} -> {target_final} streamlines")
         final_streamlines = reduce_bundle_agglomerative(intermediate_streamlines, n_target_streamlines=target_final)
     else:
-        # Dataset medio (es. 12.000 fibre): saltiamo il K-Means e andiamo diretti di Agglomerativo
-        print(f"  [Fase Unica] Dataset gestibile. Agglomerativo diretto: {total_current} -> {target_final} fibre")
+        print(f"  [Single phase] Agglomerative: {total_current} -> {target_final} streamlines")
         final_streamlines = reduce_bundle_agglomerative(current_streamlines, n_target_streamlines=target_final)
         
     return final_streamlines
 
 def save_bundle(streamlines, reference_sft, out_path: str):
     """
-    Salva un set di streamlines come .trk, ereditando lo spazio e l'affine
-    dal tractogramma di riferimento originale.
+    Save a set of streamlines ad .trk, taking originale affine.
     """
     out_sft = StatefulTractogram.from_sft(
         streamlines,
-        reference_sft,
-        # space=Space.RASMM,
+        reference_sft
     )
     save_tractogram(out_sft, out_path, bbox_valid_check=False)
-    print(f"  [Output] Salvato .trk ridotto: {out_path} ({len(streamlines)} streamlines)")
+    print(f"  [Output] Reduced bundle saved .trk: {out_path} ({len(streamlines)} streamlines)")
 
 
-from matching import load_bundle
-from dipy.io.stateful_tractogram import StatefulTractogram, Space
-from dipy.io.streamline import save_tractogram
+
+
+from concurrent.futures import ProcessPoolExecutor, as_completed
+from time import perf_counter
 import os
 
 
+def process_subject(sub, set_path, bundle, bundle_path, opp_path, red_bundle_path_a, red_bundle_path_b, set_f):
+    """Processa un singolo soggetto per una coppia di bundle."""
+    sub_path = os.path.join(set_path, sub)
 
-def reduce(user, path, red_path):
+    for file in os.listdir(sub_path):
+        if not file.endswith('.trk'):
+            continue
+
+        out_file_a = os.path.join(red_bundle_path_a, set_f, sub, f'{sub}__{bundle}_reduced.trk')
+        if os.path.exists(out_file_a):
+            continue
+
+        path_file = os.path.join(sub_path, file)
+
+        opp_sub_dir = os.path.join(opp_path, set_f, sub)
+        opp_files = os.listdir(opp_sub_dir)
+        if not opp_files:
+            print(f"Opposite bundle not found for {file}. Skipping.")
+            continue
+
+        path_opp = os.path.join(opp_sub_dir, opp_files[0])
+
+        if not os.path.exists(path_opp):
+            print(f"Opposite bundle not found for {file}. Skipping.")
+            continue
+
+        opp_bundle = bundle.replace('_L', '_R') if '_L' in bundle else bundle.replace('_R', '_L')
+        print(f"\nProcessing {file} and its opposite {opp_bundle}...")
+
+
+        # Load bundles
+        streamlines_a, sft_a = load_bundle(path_file)
+        streamlines_b, sft_b = load_bundle(path_opp)
+
+        # Reduce number of streamlines
+        streamlines_a_reduced = reduce_bundle_hybrid_dynamic(streamlines_a, streamlines_b, reduce_a=True)
+        streamlines_b_reduced = reduce_bundle_hybrid_dynamic(streamlines_a, streamlines_b, reduce_a=False)
+
+        out_folder_a = os.path.join(red_bundle_path_a, set_f, sub)
+        out_folder_b = os.path.join(red_bundle_path_b, set_f, sub)
+        os.makedirs(out_folder_a, exist_ok=True)
+        os.makedirs(out_folder_b, exist_ok=True)
+
+        name_reduced_a = f'{sub}__{bundle}_reduced.trk'
+        name_reduced_b = f'{sub}__{opp_bundle}_reduced.trk'
+
+        save_bundle(streamlines_a_reduced, sft_a, os.path.join(out_folder_a, name_reduced_a))
+        save_bundle(streamlines_b_reduced, sft_b, os.path.join(out_folder_b, name_reduced_b))
+
+    return sub  # utile per il logging
+
+from tqdm import tqdm
+
+def bundle_reduction(path, red_path, max_workers=4):
     start = perf_counter()
 
-    # user = 'alessia.ianes'
-    # path = f'/home/{user}/Desktop/data/TractoInferno_rearranged/bundles'
-    # red_path = f'/home/{user}/Desktop/data/TractoInferno_rearranged/reduced_bundles_dynamic'
-    
-
-
     for bundle in sorted(os.listdir(path)):
-        if 'AF' not in bundle:
-            continue
+        # if 'AF' not in bundle:
+        #     continue
+
         bundle_path = os.path.join(path, bundle)
+        opp_bundle = bundle.replace('_L', '_R') if '_L' in bundle else bundle.replace('_R', '_L')
         red_bundle_path_a = os.path.join(red_path, bundle)
-        red_bundle_path_b = os.path.join(red_path, bundle.replace('_L', '_R') if '_L' in bundle else bundle.replace('_R', '_L'))
+        red_bundle_path_b = os.path.join(red_path, opp_bundle)
         os.makedirs(red_bundle_path_a, exist_ok=True)
         os.makedirs(red_bundle_path_b, exist_ok=True)
 
-        opp_path = os.path.join(path, bundle.replace('_L', '_R') if '_L' in bundle else bundle.replace('_R', '_L'))
+        opp_path = os.path.join(path, opp_bundle)
 
         for set_f in sorted(os.listdir(bundle_path)):
             if set_f != 'testset':
                 continue
+
             set_path = os.path.join(bundle_path, set_f)
+            subjects = sorted(os.listdir(set_path))
 
-            for sub in sorted(os.listdir(set_path)):
-                sub_path = os.path.join(set_path, sub)
+            # ── Parallelizzazione sui soggetti ──────────────────────────────
+            with ProcessPoolExecutor(max_workers=max_workers) as executor:
+                futures = {
+                    executor.submit(
+                        process_subject,
+                        sub, set_path, bundle, bundle_path,
+                        opp_path, red_bundle_path_a, red_bundle_path_b, set_f
+                    ): sub
+                    for sub in subjects
+                }
 
-                for file in os.listdir(sub_path):
-                    if not file.endswith('.trk') or os.path.exists(os.path.join(red_bundle_path_a, set_f, sub, f'{sub}__{bundle}_reduced.trk')):
-                        continue
-                    
-                    path_file = os.path.join(sub_path, file)
+                for future in tqdm(as_completed(futures), total=len(futures)):
+                    sub = futures[future]
+                    try:
+                        future.result()
+                        print(f"✓ Sub {sub} completed")
+                    except Exception as e:
+                        print(f"✗ Error for sub {sub}: {e}")
+            # ────────────────────────────────────────────────────────────────
 
-                    # opp_name = file.replace('_32_points.trk', '_opp_32_points.trk')
-                    path_opp = [os.path.join(opp_path, set_f, sub, f) for f in os.listdir(os.path.join(opp_path, set_f, sub))][0]
-
-                    if not os.path.exists(path_opp):
-                        print(f"Opposite bundle not found for {file}. Skipping.")
-                        continue
-
-                    print(f"\nProcessing {file} and its opposite {bundle.replace('_L', '_R') if '_L' in bundle else bundle.replace('_R', '_L')}...")
-                    
-                    # Carichi i due fasci originali
-                    streamlines_a, sft_a = load_bundle(path_file)
-                    streamlines_b, sft_b = load_bundle(path_opp)
-
-                    # Riduci entrambi i fasci allo stesso identico numero di streamlines
-                    streamlines_a_reduced = reduce_bundle_hybrid_dynamic(streamlines_a, streamlines_b, reduce_a=True)
-                    streamlines_b_reduced = reduce_bundle_hybrid_dynamic(streamlines_a, streamlines_b, reduce_a=False)
-
-                    out_folder_a = os.path.join(red_bundle_path_a, set_f, sub)
-                    out_folder_b = os.path.join(red_bundle_path_b, set_f, sub)
-
-                    os.makedirs(out_folder_a, exist_ok=True)
-                    os.makedirs(out_folder_b, exist_ok=True)
-
-                    # Definiamo i nomi dei nuovi file trk
-                    name_reduced_a = f'{sub}__{bundle}_reduced.trk'
-                    name_reduced_b = f"{sub}__{bundle.replace('_L', '_R') if bundle.endswith('_L') else bundle.replace('_R', '_L')}_reduced.trk"
-
-                    
-                    path_reduced_a = os.path.join(out_folder_a, name_reduced_a)
-                    path_reduced_b = os.path.join(out_folder_b, name_reduced_b)
-
-                    # Salviamo i file ereditando le informazioni geometriche corrette (sft_a e sft_b)
-                    save_bundle(streamlines_a_reduced, sft_a, path_reduced_a)
-                    save_bundle(streamlines_b_reduced, sft_b, path_reduced_b)
-            
             end = perf_counter()
-            print(f"Time: {end - start}")
+            print(f"Time for {bundle} / {set_f}: {end - start:.2f}s")
