@@ -1,18 +1,18 @@
-from time import perf_counter
-
+import os
 import numpy as np
-from sklearn.cluster import MiniBatchKMeans, AgglomerativeClustering
+from tqdm import tqdm
 from scipy.spatial.distance import cdist
 from sklearn.metrics import pairwise_distances
-
-
-from dipy.tracking.streamline import set_number_of_points
 from dipy.io.streamline import save_tractogram
+from dipy.tracking.streamline import set_number_of_points
+from dipy.io.stateful_tractogram import StatefulTractogram
+from concurrent.futures import ProcessPoolExecutor, as_completed
+from sklearn.cluster import MiniBatchKMeans, AgglomerativeClustering
 
 
 from matching import load_bundle
-from dipy.io.stateful_tractogram import StatefulTractogram
-import os
+
+
 
 def reduce_bundle_kmeans(streamlines, n_target_streamlines=1000):
     """
@@ -116,8 +116,6 @@ def reduce_bundle_agglomerative(streamlines, n_target_streamlines=1000):
 
 
 
-import numpy as np
-
 def reduce_bundle_hybrid_dynamic(streamlines_a, streamlines_b, reduce_a=True):
     """
     Reduce bundle apllying dynamic constraint:
@@ -175,9 +173,6 @@ def save_bundle(streamlines, reference_sft, out_path: str):
 
 
 
-from concurrent.futures import ProcessPoolExecutor, as_completed
-from time import perf_counter
-import os
 
 
 def process_subject(sub, set_path, bundle, bundle_path, opp_path, red_bundle_path_a, red_bundle_path_b, set_f):
@@ -229,12 +224,11 @@ def process_subject(sub, set_path, bundle, bundle_path, opp_path, red_bundle_pat
         save_bundle(streamlines_a_reduced, sft_a, os.path.join(out_folder_a, name_reduced_a))
         save_bundle(streamlines_b_reduced, sft_b, os.path.join(out_folder_b, name_reduced_b))
 
-    return sub  # utile per il logging
+    return sub  # useful for logging
 
-from tqdm import tqdm
+
 
 def bundle_reduction(path, red_path, max_workers=4):
-    start = perf_counter()
 
     for bundle in sorted(os.listdir(path)):
         # if 'AF' not in bundle:
@@ -256,7 +250,7 @@ def bundle_reduction(path, red_path, max_workers=4):
             set_path = os.path.join(bundle_path, set_f)
             subjects = sorted(os.listdir(set_path))
 
-            # ── Parallelizzazione sui soggetti ──────────────────────────────
+            # Parallelize on subjects
             with ProcessPoolExecutor(max_workers=max_workers) as executor:
                 futures = {
                     executor.submit(
@@ -274,7 +268,4 @@ def bundle_reduction(path, red_path, max_workers=4):
                         print(f"✓ Sub {sub} completed")
                     except Exception as e:
                         print(f"✗ Error for sub {sub}: {e}")
-            # ────────────────────────────────────────────────────────────────
-
-            end = perf_counter()
-            print(f"Time for {bundle} / {set_f}: {end - start:.2f}s")
+          
