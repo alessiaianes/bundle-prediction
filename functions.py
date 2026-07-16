@@ -405,60 +405,54 @@ def info_sub_bundles(path):
         2. Name of subjects for each set and for each bundle
     """
 
-    # --- CONFIGURAZIONE ---
-    # Percorso base (il punto '.' indica la cartella corrente in cui si trova lo script)
+    # --- Configuration ---
+    
     BASE_PATH = path
 
-    # Nomi aggiornati delle cartelle dei tre set
     SETS = ["testset", "trainset", "validset"]
 
-    # I 6 bundle di interesse
     BUNDLES = ["AF", "FAT", "ILF", "PYT", "SLF", "MdLF"]
     # ----------------------
 
 
-    # Liste che conterranno i singoli dataframe di ogni set prima dell'unione finale
+    # List for single dataframe before merging process
     all_sets_names_list = []
     all_sets_counts_list = []
     
     for set_name in SETS:
         set_dir = os.path.join(BASE_PATH, set_name)
         
-        # Salta la cartella se non esiste
+    
         if not os.path.exists(set_dir):
             print(f"Attenzione: Cartella non trovata -> {set_dir}")
             continue
             
-        # Inizializza il dizionario per i soggetti di questo specifico set
+        # Initialize dictionary for this specific set subjects
         bundle_data = {bundle: [] for bundle in BUNDLES}
         
-        # Scansione dei soggetti dentro il set corrente
         for subj_folder in os.listdir(set_dir):
             subj_dir = os.path.join(set_dir, subj_folder)
             
             if os.path.isdir(subj_dir):
                 files = os.listdir(subj_dir)
-                sub_name = subj_folder # Nome del soggetto (es. sub-1)
+                sub_name = subj_folder 
                 
                 for bundle in BUNDLES:
-                    # Controllo presenza di entrambi i file (Destro e Sinistro)
+                    # Check bundle in both sides
                     has_left = any(f"{bundle}_L" in f for f in files)
                     has_right = any(f"{bundle}_R" in f for f in files)
                     
                     if has_left and has_right:
                         bundle_data[bundle].append(sub_name)
         
-        # --- PREPARAZIONE DATI PER CSV 1 (Nomi Soggetti) ---
-        # Creiamo il dataframe per il set corrente (allineando le liste con pd.Series)
+        # --- DATA PREPARATION FOR TABLE 2 ---
         df_set_names = pd.DataFrame({k: pd.Series(v) for k, v in bundle_data.items()})
         
-        # Inseriamo la colonna 'Set' in posizione 0 (la prima colonna)
         df_set_names.insert(0, 'Set', set_name)
         
-        # Aggiungiamo questo dataframe alla lista globale
         all_sets_names_list.append(df_set_names)
         
-        # --- PREPARAZIONE DATI PER CSV 2 (Conteggi) ---
+        # --- DATA PREPARATION FOR TABLE 1 ---
         # Creiamo un dizionario con il nome del set e il conteggio di ogni bundle
         bundle_counts = {'Set': [set_name]}
         for bundle in BUNDLES:
@@ -467,11 +461,10 @@ def info_sub_bundles(path):
         df_set_counts = pd.DataFrame(bundle_counts)
         all_sets_counts_list.append(df_set_counts)
 
-    # --- UNIONE FINALE E SALVATAGGIO IN CSV ---
+    # --- FINAL MERGE AND SAVE ---
     
-    # 1. Tabella dei Nomi (Target: ~284 x 7)
+    # TABLE 2
     if all_sets_names_list:
-        # pd.concat unisce verticalmente i dataframe dei 3 set
         df_final_names = pd.concat(all_sets_names_list, ignore_index=True)
         
         output_names_file = "/home/alessia/Desktop/data/TractoInferno_aligned/tractoinferno_info/all_sets_subjects.csv"
@@ -479,7 +472,7 @@ def info_sub_bundles(path):
         print(f"Creato con successo: {output_names_file}")
         print(f" -> Dimensioni tabella: {df_final_names.shape[0]} righe x {df_final_names.shape[1]} colonne\n")
     
-    # 2. Tabella dei Conteggi (Target: 3 x 7)
+    # TABLE 1
     if all_sets_counts_list:
         df_final_counts = pd.concat(all_sets_counts_list, ignore_index=True)
         
