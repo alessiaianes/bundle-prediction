@@ -116,18 +116,18 @@ def reduce_bundle_agglomerative(streamlines, n_target_streamlines=1000):
 
 
 
-def reduce_bundle_hybrid_dynamic(streamlines_a, streamlines_b, reduce_a=True):
+def reduce_bundle_hybrid_dynamic(streamlines_a, streamlines_b, target_number, reduce_a=True):
     """
     Reduce bundle apllying dynamic constraint:
-    target = min(len(A), len(B), 5000)
+    target = min(len(A), len(B), 10000)
     
     If reduce_a=True bundle A is reduced, otherwise bundle B.
     """
     len_a = len(streamlines_a)
     len_b = len(streamlines_b)
     
-    # 1. Compute how many streamlines to keep (the minimum among 5000, the number of streamlines of A and the number of streamlines of B)
-    target_final = min(len_a, len_b, 5000)
+    # 1. Compute how many streamlines to keep (the minimum among 10000, the number of streamlines of A and the number of streamlines of B)
+    target_final = min(len_a, len_b, target_number)
     
     # Select which bundle to reduce
     current_streamlines = streamlines_a if reduce_a else streamlines_b
@@ -145,7 +145,7 @@ def reduce_bundle_hybrid_dynamic(streamlines_a, streamlines_b, reduce_a=True):
 
     # 2. Manage the pipeline
     # We fix a target to reduce the number of streamlines from original to k-means, so that agglomerative clustering will take less
-    target_intermediate = 10000
+    target_intermediate = target_number + (target_number // 2)
     
     if total_current > target_intermediate:
         print(f"  [Phase 1] K-Means: {total_current} -> {target_intermediate} streamlines")
@@ -175,7 +175,7 @@ def save_bundle(streamlines, reference_sft, out_path: str):
 
 
 
-def process_subject(sub, set_path, bundle, bundle_path, opp_path, red_bundle_path_a, red_bundle_path_b, set_f):
+def process_subject(sub, set_path, bundle, bundle_path, opp_path, red_bundle_path_a, red_bundle_path_b, set_f, target_number):
     """Processa un singolo soggetto per una coppia di bundle."""
     sub_path = os.path.join(set_path, sub)
 
@@ -210,8 +210,8 @@ def process_subject(sub, set_path, bundle, bundle_path, opp_path, red_bundle_pat
         streamlines_b, sft_b = load_bundle(path_opp)
 
         # Reduce number of streamlines
-        streamlines_a_reduced = reduce_bundle_hybrid_dynamic(streamlines_a, streamlines_b, reduce_a=True)
-        streamlines_b_reduced = reduce_bundle_hybrid_dynamic(streamlines_a, streamlines_b, reduce_a=False)
+        streamlines_a_reduced = reduce_bundle_hybrid_dynamic(streamlines_a, streamlines_b, target_number, reduce_a=True)
+        streamlines_b_reduced = reduce_bundle_hybrid_dynamic(streamlines_a, streamlines_b, target_number, reduce_a=False)
 
         out_folder_a = os.path.join(red_bundle_path_a, set_f, sub)
         out_folder_b = os.path.join(red_bundle_path_b, set_f, sub)
@@ -228,7 +228,7 @@ def process_subject(sub, set_path, bundle, bundle_path, opp_path, red_bundle_pat
 
 
 
-def bundle_reduction(path, red_path, max_workers=4):
+def bundle_reduction(path, red_path, target_number, max_workers=4):
 
     for bundle in sorted(os.listdir(path)):
         # if 'AF' not in bundle:
@@ -256,7 +256,7 @@ def bundle_reduction(path, red_path, max_workers=4):
                     executor.submit(
                         process_subject,
                         sub, set_path, bundle, bundle_path,
-                        opp_path, red_bundle_path_a, red_bundle_path_b, set_f
+                        opp_path, red_bundle_path_a, red_bundle_path_b, set_f, target_number
                     ): sub
                     for sub in subjects
                 }

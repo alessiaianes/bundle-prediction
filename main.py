@@ -49,12 +49,12 @@ if __name__ == '__main__':
     start_reducing = perf_counter()
 
     # ====== 1. Reduce number of streamlines
-    prototype_threshold = 5000
+    new_sl = 10000
     path_bundles = f'/home/{user}/Desktop/data/TractoInferno_rearranged/bundles'
     reduced_bundles = f'/home/{user}/Desktop/data/TractoInferno_rearranged/reduced_bundles_dynamic_parallel_sub'
     os.makedirs(reduced_bundles, exist_ok=True)
 
-    bundle_reduction(path_bundles, reduced_bundles)
+    bundle_reduction(path_bundles, reduced_bundles, new_sl)
 
     end_reducing = perf_counter()
 
