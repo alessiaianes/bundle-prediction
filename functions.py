@@ -47,7 +47,7 @@ def compute_dice_overlap(flip, real, anat):# UESD ONLY FOR AN INITIAL CHECK
 
 
 
-def flip_bundle(bundle_path, save_path):
+def flip_bundle(set_check, bundle_path, save_path):
     """
     Flip all bundles in the given path and save them.
     """
@@ -55,6 +55,8 @@ def flip_bundle(bundle_path, save_path):
     for bundles in sorted(os.listdir(bundle_path)):
       
         for set_f in sorted(os.listdir(os.path.join(bundle_path, bundles))):
+            if set_f !=set_check:
+                continue
             for sub in sorted(os.listdir(os.path.join(bundle_path, bundles, set_f))):
                 for file in os.listdir(os.path.join(bundle_path, bundles, set_f, sub)):
 
@@ -178,15 +180,17 @@ def merge_bundles(path, sub, save_path):
                 json.dump(correspondeces, target)
 
 
-def merging(path, user):
+def merging(path, set_check, user):
     """
     Calls "merge_bundles" to create a single trx per subject.
     """
-    for set_f in os.listdir(path):
+    for set_f in sorted(os.listdir(path)):
+        if set_f != set_check:
+            continue
         set_path = os.path.join(path, set_f)
-        for sub in os.listdir(set_path):
+        for sub in sorted(os.listdir(set_path)):
             sub_path = os.path.join(set_path, sub)
-            saving_folder = f'/home/{user}/Desktop/data/TractoInferno_subjects/{set_f}/{sub}'
+            saving_folder = f'/home/{user}/Desktop/data/trx_subjects/{set_f}/{sub}'
             os.makedirs(saving_folder, exist_ok=True)
             print(f"Merging new trx for sub {sub}...")
             merge_bundles(sub_path, sub, saving_folder)

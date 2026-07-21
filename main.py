@@ -45,16 +45,17 @@ if __name__ == '__main__':
 
 
     # ========== PREPROCESSING PHASE ==========
+    preprocessing_set = 'trainset'
     
     start_reducing = perf_counter()
 
     # ====== 1. Reduce number of streamlines
     new_sl = 10000
     path_bundles = f'/home/{user}/Desktop/data/TractoInferno_rearranged/bundles'
-    reduced_bundles = f'/home/{user}/Desktop/data/TractoInferno_rearranged/reduced_bundles_dynamic_parallel_sub'
+    reduced_bundles = f'/home/{user}/Desktop/data/TractoInferno_rearranged/reduced_bundles'
     os.makedirs(reduced_bundles, exist_ok=True)
 
-    bundle_reduction(path_bundles, reduced_bundles, new_sl)
+    bundle_reduction(path_bundles, preprocessing_set, reduced_bundles, new_sl)
 
     end_reducing = perf_counter()
 
@@ -64,11 +65,11 @@ if __name__ == '__main__':
     # ====== 2. Resampling number of points per streamline  
     start_resampling = perf_counter()
 
-    reduced_streamlines = f'/home/{user}/Desktop/data/TractoInferno_rearranged/reduced_streamlines_NEW'
+    reduced_streamlines = f'/home/{user}/Desktop/data/TractoInferno_rearranged/reduced_streamlines'
     os.makedirs(reduced_streamlines, exist_ok=True)
     points = 32
 
-    nb_points_reduction(reduced_bundles, reduced_streamlines, points)
+    nb_points_reduction(preprocessing_set, reduced_bundles, reduced_streamlines, points)
 
     end_resampling = perf_counter()
 
@@ -77,9 +78,9 @@ if __name__ == '__main__':
 
     # ====== 3. Flip bundles to prepare data for correspondence check
     start_flipping = perf_counter()
-    flip_folder = f'/home/{user}/Desktop/data/TractoInferno_rearranged/flip_bundles_NEW'
+    flip_folder = f'/home/{user}/Desktop/data/TractoInferno_rearranged/flip_bundles'
     os.makedirs(flip_folder, exist_ok=True)
-    flip_bundle(reduced_streamlines, flip_folder)
+    flip_bundle(preprocessing_set, reduced_streamlines, flip_folder)
     end_flipping = perf_counter()
 
     print(f"Time for flipping: {end_flipping - start_flipping}")
@@ -89,8 +90,8 @@ if __name__ == '__main__':
 
     # ====== 4. Check correspondence
     start_matching = perf_counter()
-    matching_folder = f'/home/{user}/Desktop/data/TractoInferno_rearranged/match_mdf_PARALLEL'
-    match_streamlines(user, reduced_streamlines, flip_folder, matching_folder)
+    matching_folder = f'/home/{user}/Desktop/data/TractoInferno_rearranged/match_mdf'
+    match_streamlines(user, preprocessing_set, reduced_streamlines, flip_folder, matching_folder)
     end_matching = perf_counter()
 
     print(f"Time for matching: {end_matching - start_matching}")
@@ -100,7 +101,7 @@ if __name__ == '__main__':
     start_merging = perf_counter()
     merged_trx_folder = f"{matching_folder}/trx"
     os.makedirs(merged_trx_folder, exist_ok=True)
-    merging(merged_trx_folder, user)
+    merging(merged_trx_folder, preprocessing_set, user)
     end_merging = perf_counter()
 
     print(f"Time for merging trx: {end_merging - start_merging}")
@@ -110,12 +111,12 @@ if __name__ == '__main__':
 
     # ====== 6. Smoothing bundles
     start_smoothing = perf_counter()
-    smooth_bundles_folder = f'/home/{user}/Desktop/data/TractoInferno_rearranged/smooth_bundles_NEW'
+    smooth_bundles_folder = f'/home/{user}/Desktop/data/TractoInferno_rearranged/smooth_bundles'
     os.makedirs(smooth_bundles_folder, exist_ok=True)
 
     sigma = 3
 
-    smooth_bundles(reduced_streamlines, smooth_bundles_folder, sigma)
+    smooth_bundles(preprocessing_set, reduced_streamlines, smooth_bundles_folder, sigma)
     end_smoothing = perf_counter()
 
     print(f"Time for smoothing: {end_smoothing - start_smoothing}")

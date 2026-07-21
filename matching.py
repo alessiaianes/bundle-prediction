@@ -113,8 +113,7 @@ def process_subject_match(sub, user, path_sl, path_flip, matching_folder, bundle
     return sub, "done"
 
 
-def match_streamlines(user, path_sl, path_flip, matching_folder, max_workers=4):
-    from time import perf_counter
+def match_streamlines(user, set_check, path_sl, path_flip, matching_folder, max_workers=10):
     mdf_threshold = 10.0
 
     for bundle in sorted(os.listdir(path_sl)):
@@ -127,7 +126,7 @@ def match_streamlines(user, path_sl, path_flip, matching_folder, max_workers=4):
             continue  # skip bundle -> it does not have _L/_R
 
         for set_f in sorted(os.listdir(os.path.join(path_sl, bundle))):
-            if set_f != 'testset':
+            if set_f != set_check:
                 continue
 
             subjects = sorted(os.listdir(os.path.join(path_sl, bundle, set_f)))

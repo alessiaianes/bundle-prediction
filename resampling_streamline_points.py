@@ -1,9 +1,11 @@
 import os
 import subprocess
 
-def nb_points_reduction(path, save_path, points):
+def nb_points_reduction(set_check, path, save_path, points):
     for bundle in sorted(os.listdir(path)):
         for set_f in sorted(os.listdir(os.path.join(path, bundle))):
+            if set_f != set_check:
+                continue
             for sub in sorted(os.listdir(os.path.join(path, bundle, set_f))):
                 for file in os.listdir(os.path.join(path, bundle, set_f, sub)):
                     file_path = os.path.join(path, bundle, set_f, sub, file)

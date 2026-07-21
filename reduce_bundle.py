@@ -228,7 +228,7 @@ def process_subject(sub, set_path, bundle, bundle_path, opp_path, red_bundle_pat
 
 
 
-def bundle_reduction(path, red_path, target_number, max_workers=4):
+def bundle_reduction(path, set_check, red_path, target_number, max_workers=4):
 
     for bundle in sorted(os.listdir(path)):
         # if 'AF' not in bundle:
@@ -244,7 +244,7 @@ def bundle_reduction(path, red_path, target_number, max_workers=4):
         opp_path = os.path.join(path, opp_bundle)
 
         for set_f in sorted(os.listdir(bundle_path)):
-            if set_f != 'testset':
+            if set_f != set_check:
                 continue
 
             set_path = os.path.join(bundle_path, set_f)

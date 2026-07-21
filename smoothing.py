@@ -1,10 +1,12 @@
 import os
 import subprocess
 
-def smooth_bundles(in_path, out_path, sigma):
+def smooth_bundles(set_check, in_path, out_path, sigma):
 
     for bundle in sorted(os.listdir(in_path)):
         for set_f in sorted(os.listdir(os.path.join(in_path, bundle))):
+            if set_f != set_check:
+                continue
             for sub in sorted(os.listdir(os.path.join(in_path, bundle, set_f))):
                 out_folder = os.path.join(out_path, bundle, set_f, sub)
                 os.makedirs(out_folder, exist_ok=True)
